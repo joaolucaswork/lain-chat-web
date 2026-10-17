@@ -23,6 +23,25 @@ system prompt → stream do LLM → `remember` em background (`mode: bundle`,
 com dedup ADD/UPDATE/NOOP). Sem lain-memory no ar o chat funciona, mas sem
 memória. Vault (`/memorias`) lista `lain-memory` via `/api/vault/*`.
 
+## Manter no ar (Mac local)
+
+Docker (Qdrant+Redis) já usa `restart: unless-stopped` — basta o Docker
+Desktop abrir no login. Os dois serviços Bun ficam no pm2:
+
+```bash
+cp server/.env.example server/.env   # 1ª vez: preencher chaves
+pm2 start ecosystem.config.cjs       # lain-memory :3341 + BFF :3335
+pm2 save
+```
+
+Para sobreviver a reboot, rode uma vez (pede sudo):
+
+```bash
+sudo env PATH=$PATH:/opt/homebrew/bin /opt/homebrew/lib/node_modules/pm2/bin/pm2 startup launchd -u lucas --hp /Users/lucas
+```
+
+Comandos úteis: `pm2 list`, `pm2 logs lain-chat-bff`, `pm2 restart all`.
+
 ## React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.

@@ -25,6 +25,24 @@ import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 
 const _dir = dirname(fileURLToPath(import.meta.url));
+
+// Load server/.env (Bun só auto-carrega .env do cwd — o BFF pode rodar de outro dir via pm2).
+// Env explícito sempre vence.
+try {
+  const envFile = Bun.file(join(_dir, '.env'));
+  if (await envFile.exists()) {
+    for (const line of (await envFile.text()).split('\n')) {
+      const t = line.trim();
+      if (!t || t.startsWith('#')) continue;
+      const eq = t.indexOf('=');
+      if (eq === -1) continue;
+      const k = t.slice(0, eq).trim();
+      let v = t.slice(eq + 1).trim();
+      if (v.length >= 2 && ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'")))) v = v.slice(1, -1);
+      if (v && !(k in process.env)) process.env[k] = v;
+    }
+  }
+} catch { /* sem .env = usa env do processo */ }
 const PORT = parseInt(process.env.CHAT_PORT || '3335', 10);
 const MEMORY_URL = (process.env.LAIN_MEMORY_URL || 'http://localhost:3341').replace(/\/$/, '');
 const MEMORY_KEY = process.env.LAIN_MEMORY_API_KEY || process.env.LAIN_API_KEY || '';
