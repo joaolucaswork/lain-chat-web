@@ -1,4 +1,29 @@
-# React + TypeScript + Vite
+# lain-chat-web
+
+Chat web com memória persistente. Frontend React + BFF em Bun (`server/server.ts`)
+que fala com o `lain-memory` (`:3341`) para recall/remember/grafo.
+
+## Rodando
+
+Pré-requisitos: `lain-memory` no ar (`docker compose up -d` + `bun run dev` em `lain-memory`).
+
+```bash
+cp server/.env.example server/.env   # preencha LAIN_LLM_API_KEY
+bun install
+bun run build    # gera dist/ servido pelo BFF
+bun run server   # :3335
+```
+
+Dev (HMR): `bun run server` num terminal + `bun run dev` noutro (`/api/*` proxia para `:3335`).
+
+## Como funciona
+
+Cada mensagem: `recall` + `graph/query` no lain-memory → injeta memórias no
+system prompt → stream do LLM → `remember` em background (`mode: bundle`,
+com dedup ADD/UPDATE/NOOP). Sem lain-memory no ar o chat funciona, mas sem
+memória. Vault (`/memorias`) lista `lain-memory` via `/api/vault/*`.
+
+## React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 

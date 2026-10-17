@@ -10,4 +10,10 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  server: {
+    // Dev: encaminha /api/* para o BFF (bun run server/server.ts)
+    proxy: {
+      '/api': `http://localhost:${process.env.CHAT_PORT || 3335}`,
+    },
+  },
 })
