@@ -54,7 +54,7 @@ const LLM_KEY = process.env.LAIN_LLM_API_KEY
   || process.env.OPENROUTER_API_KEY
   || process.env.AI_GATEWAY_API_KEY
   || '';
-const DEFAULT_MODEL = process.env.LAIN_LLM_MODEL || 'deepseek/deepseek-v4.1-flash-1017';
+const DEFAULT_MODEL = process.env.LAIN_LLM_MODEL || 'z-ai/glm-5.3-flash';
 const CHAT_PROJECT = process.env.LAIN_CHAT_PROJECT || '';
 const FRONTEND_DIST = process.env.FRONTEND_DIST || join(_dir, '..', 'dist');
 

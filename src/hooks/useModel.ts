@@ -3,7 +3,7 @@ import { useState, useCallback } from 'react'
 const STORAGE_KEY = 'lain-chat-model'
 
 const MODELS = [
-  'deepseek/deepseek-v4.1-flash-1017',
+  'z-ai/glm-5.3-flash',
 ]
 
 function getStoredModel(): string {
