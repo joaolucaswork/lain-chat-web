@@ -15,12 +15,13 @@
  *   LAIN_LLM_API_KEY     — chave (fallback OPENROUTER_API_KEY, AI_GATEWAY_API_KEY)
  *   LAIN_LLM_MODEL       — modelo default (default deepseek/deepseek-v4-flash)
  *   LAIN_CHAT_PROJECT    — escopo de projeto das memórias (default '' = global)
++ *   SESSIONS_DIR           — diretório das sessões em disco (default server/data/sessions)
  *
  * Uso: bun run server/server.ts
  */
 
-import { readFileSync, existsSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { readFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import { join, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 
@@ -57,6 +58,7 @@ const LLM_KEY = process.env.LAIN_LLM_API_KEY
 const DEFAULT_MODEL = process.env.LAIN_LLM_MODEL || 'z-ai/glm-5.3-flash';
 const CHAT_PROJECT = process.env.LAIN_CHAT_PROJECT || '';
 const FRONTEND_DIST = process.env.FRONTEND_DIST || join(_dir, '..', 'dist');
+const SESSIONS_DIR = process.env.SESSIONS_DIR || join(_dir, 'data', 'sessions');
 
 const UI_PATH = join(FRONTEND_DIST, 'index.html');
 const UI_FALLBACK = '<html><body><h1>Chat UI not found. Run `bun run build` in repo root.</h1></body></html>';
@@ -90,6 +92,66 @@ const sessions = new Map<string, Session>();
 const sseClients = new Map<string, Set<ReadableStreamDefaultController<string>>>();
 const abortCtrls = new Map<string, AbortController>();
 
+// ─── Sessions em disco ───
+// Um JSON por sessão: <SESSIONS_DIR>/<id>.json
+// Sobrevive a restart do BFF; escrita síncrona (arquivos pequenos, baixo volume)
+// para não perder a mensagem do usuário se o processo cair no meio do stream.
+
+function isSafeSessionId(id: string): boolean {
+  return /^[A-Za-z0-9_-]{1,128}$/.test(id);
+}
+
+function sessionFile(id: string): string {
+  return join(SESSIONS_DIR, `${basename(id)}.json`);
+}
+
+function persistSession(s: Session): void {
+  if (!isSafeSessionId(s.id)) return;
+  try {
+    mkdirSync(SESSIONS_DIR, { recursive: true });
+    writeFileSync(sessionFile(s.id), JSON.stringify(s), 'utf-8');
+  } catch (err) {
+    console.error('[bff] persist session failed:', err instanceof Error ? err.message : err);
+  }
+}
+
+function loadSessionsFromDisk(): void {
+  try {
+    mkdirSync(SESSIONS_DIR, { recursive: true });
+  } catch { return; }
+  let files: string[] = [];
+  try {
+    files = readdirSync(SESSIONS_DIR).filter((f) => f.endsWith('.json'));
+  } catch (err) {
+    console.error('[bff] load sessions failed:', err instanceof Error ? err.message : err);
+    return;
+  }
+  let loaded = 0;
+  for (const f of files) {
+    const id = basename(f, '.json');
+    if (!isSafeSessionId(id)) continue;
+    try {
+      const raw = readFileSync(join(SESSIONS_DIR, f), 'utf-8');
+      const s = JSON.parse(raw) as Session;
+      if (!s || s.id !== id || !Array.isArray(s.messages)) continue;
+      sessions.set(id, {
+        id,
+        messages: s.messages.filter(
+          (m): m is ChatMsg =>
+            !!m && (m.role === 'system' || m.role === 'user' || m.role === 'assistant') &&
+            (typeof m.content === 'string' || m.content === null),
+        ),
+        createdAt: typeof s.createdAt === 'number' ? s.createdAt : Date.now(),
+        model: typeof s.model === 'string' && s.model ? s.model : DEFAULT_MODEL,
+      });
+      loaded++;
+    } catch {
+      console.error(`[bff] ignoring corrupt session file: ${f}`);
+    }
+  }
+  if (loaded > 0) console.log(`[bff] loaded ${loaded} session(s) from ${SESSIONS_DIR}`);
+}
+
 // ─── Helpers ───
 
 function json(data: unknown, status = 200): Response {
@@ -122,9 +184,12 @@ function getSession(id: string): Session {
       model: DEFAULT_MODEL,
     };
     sessions.set(id, s);
+    persistSession(s);
   }
   return s;
 }
+
+loadSessionsFromDisk();
 
 async function fetchJson(url: string, body: unknown, timeoutMs = 5000): Promise<any> {
   const res = await fetch(url, {
@@ -445,6 +510,7 @@ async function processMessage(session: Session, userMessage: string, signal?: Ab
     return; // sem remember de resposta vazia
   }
   session.messages.push({ role: 'assistant', content: finalText });
+  persistSession(session);
   broadcast(session.id, 'token_end', { text: streamed ? '' : finalText });
   broadcast(session.id, 'done', {});
 
@@ -552,6 +618,7 @@ Bun.serve({
       if (typeof body.model === 'string' && body.model) session.model = body.model;
 
       session.messages.push({ role: 'user', content: message });
+      persistSession(session);
       broadcast(sessionId, 'user_message', { text: message });
       broadcast(sessionId, 'processing_start', { model: session.model });
 
@@ -587,9 +654,18 @@ Bun.serve({
     }
 
     // ── Clear ──
+    // Limpa as mensagens da sessão atual SEM remover a sessão da lista,
+    // para o histórico continuar acessível. "New conversation" no frontend
+    // nem chama mais isso — só troca para um id novo preservando a antiga.
     if (req.method === 'POST' && path === '/api/clear') {
       const sessionId = params.get('sessionId');
-      if (sessionId) sessions.delete(sessionId);
+      if (sessionId) {
+        const s = sessions.get(sessionId);
+        if (s) {
+          s.messages = [s.messages[0]];
+          persistSession(s);
+        }
+      }
       return json({ ok: true });
     }
 
@@ -599,7 +675,7 @@ Bun.serve({
         id, createdAt: s.createdAt, model: s.model,
         messageCount: s.messages.filter(m => m.role !== 'system').length,
         preview: s.messages.find(m => m.role === 'user')?.content?.slice(0, 100) || '',
-      }));
+      })).sort((a, b) => b.createdAt - a.createdAt);
       return json({ sessions: list });
     }
 

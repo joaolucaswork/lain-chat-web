@@ -154,12 +154,11 @@ export function useChat(model: string) {
   }, [loadMessages, connectSSE])
 
   const clearSession = useCallback(async () => {
-    try {
-      await fetch(`/api/clear?sessionId=${sessionId}`, { method: 'POST' })
-    } catch {}
+    // "New conversation" = apenas troca para um id novo.
+    // A sessão antiga permanece no servidor para continuar acessível no histórico.
     const newId = crypto.randomUUID()
     switchSession(newId)
-  }, [sessionId, switchSession])
+  }, [switchSession])
 
   useEffect(() => {
     latestRequestedSessionRef.current = sessionId
