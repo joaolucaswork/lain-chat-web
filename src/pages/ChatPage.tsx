@@ -1,6 +1,8 @@
 import { useOutletContext } from 'react-router-dom'
 import { ChatMessages } from '@/components/ChatMessages'
 import { ChatInput } from '@/components/ChatInput'
+import { ThemeToggle } from '@/components/ThemeToggle'
+import { SidebarTrigger } from '@/components/ui/sidebar'
 import type { LayoutContext } from './Layout'
 
 export function ChatPage() {
@@ -8,14 +10,14 @@ export function ChatPage() {
   const { messages, processing, status, sendMessage, stopGenerating } = ctx
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header bar */}
-      <div className="flex items-center justify-end px-4 py-2 border-b border-border bg-card gap-3">
-        {/* Status */}
-        <div className="flex items-center gap-1.5 shrink-0">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex shrink-0 items-center gap-3 border-b border-border bg-card px-4 py-2">
+        <SidebarTrigger />
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
+          <ThemeToggle />
           <span
-            className={`w-2 h-2 rounded-full ${
-              processing ? 'bg-yellow-500 animate-pulse' : 'bg-green-500'
+            className={`h-2 w-2 rounded-full ${
+              processing ? 'animate-pulse bg-yellow-500' : 'bg-green-500'
             }`}
           />
           <span className="text-xs text-muted-foreground">{status}</span>

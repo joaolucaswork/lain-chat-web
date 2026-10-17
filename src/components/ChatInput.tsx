@@ -1,5 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
-import { Button } from '@/components/ui/button'
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupText,
+  InputGroupTextarea,
+} from '@/components/ui/input-group'
+import { Spinner } from '@/components/ui/spinner'
 import { Send, Square } from 'lucide-react'
 
 interface ChatInputProps {
@@ -14,69 +21,64 @@ export function ChatInput({ onSend, onStop, disabled, placeholder = 'Send a mess
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
-    if (!disabled && textareaRef.current) {
-      textareaRef.current.focus()
-    }
+    if (!disabled) textareaRef.current?.focus()
   }, [disabled])
 
   const handleSend = () => {
     if (!text.trim() || disabled) return
     onSend(text.trim())
     setText('')
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto'
-    }
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSend()
-    }
-  }
-
-  const handleInput = () => {
-    const el = textareaRef.current
-    if (el) {
-      el.style.height = 'auto'
-      el.style.height = `${Math.min(el.scrollHeight, 200)}px`
-    }
+    if (textareaRef.current) textareaRef.current.style.height = 'auto'
   }
 
   return (
-    <div className="border-t border-border p-4 bg-background">
-      <div className="flex items-end gap-2 max-w-4xl mx-auto">
-        <textarea
-          ref={textareaRef}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onInput={handleInput}
-          placeholder={placeholder}
-          disabled={disabled}
-          rows={1}
-          className="flex-1 resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 min-h-[40px] max-h-[200px]"
-        />
-        {disabled && onStop ? (
-          <Button
-            onClick={onStop}
-            size="icon"
-            variant="destructive"
-            className="h-10 w-10 shrink-0"
-            title="Stop generating"
-          >
-            <Square className="h-4 w-4 fill-current" />
-          </Button>
-        ) : (
-          <Button
-            onClick={handleSend}
-            disabled={disabled || !text.trim()}
-            size="icon"
-            className="h-10 w-10 shrink-0"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
-        )}
+    <div className="shrink-0 border-t border-border bg-background p-4">
+      <div className="mx-auto w-full max-w-4xl">
+        <InputGroup className="has-[[data-slot=input-group-control]:focus-visible]:border-foreground/20 has-[[data-slot=input-group-control]:focus-visible]:ring-0">
+          <InputGroupTextarea
+            ref={textareaRef}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                handleSend()
+              }
+            }}
+            placeholder={placeholder}
+            disabled={disabled}
+            rows={1}
+            className="min-h-[40px] max-h-[200px]"
+            aria-label="Message"
+          />
+          <InputGroupAddon align="block-end" className="justify-end">
+            <InputGroupText className="mr-auto text-xs">
+              Enter to send, Shift+Enter for new line
+            </InputGroupText>
+            {disabled && onStop ? (
+              <InputGroupButton
+                size="icon-sm"
+                variant="destructive"
+                onClick={onStop}
+                title="Stop generating"
+                aria-label="Stop generating"
+              >
+                <Square className="fill-current" />
+              </InputGroupButton>
+            ) : (
+              <InputGroupButton
+                size="icon-sm"
+                variant="default"
+                onClick={handleSend}
+                disabled={disabled || !text.trim()}
+                title="Send"
+                aria-label="Send"
+              >
+                {disabled ? <Spinner /> : <Send />}
+              </InputGroupButton>
+            )}
+          </InputGroupAddon>
+        </InputGroup>
       </div>
     </div>
   )

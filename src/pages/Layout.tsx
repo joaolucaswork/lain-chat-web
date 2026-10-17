@@ -3,9 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useModel } from '@/hooks/useModel'
 import { useChat } from '@/hooks/useChat'
-import { cn } from '@/lib/utils'
 import type { ChatMessage, Session } from '@/types'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Select,
   SelectContent,
@@ -13,6 +11,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupAction,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuAction,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+} from '@/components/ui/sidebar'
 import { MessageSquare, BookOpen, Plus, MoreHorizontal, Trash2 } from 'lucide-react'
 
 export interface LayoutContext {
@@ -28,7 +42,6 @@ export function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
   const [sessions, setSessions] = useState<Session[]>([])
-  // Menu "Apagar" renderizado em portal (fixed) para não ser cortado pelo overflow do ScrollArea
   const [menu, setMenu] = useState<{ id: string; top: number; right: number } | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const { model, setModel, models } = useModel()
@@ -48,7 +61,6 @@ export function Layout() {
     return () => clearInterval(interval)
   }, [refreshSessions])
 
-  // Fecha o menu de "..." ao clicar fora, rolar, redimensionar ou apertar Escape
   useEffect(() => {
     if (!menu) return
     const close = () => setMenu(null)
@@ -81,7 +93,6 @@ export function Layout() {
         }
         await refreshSessions()
       } catch {
-        // mantém a lista como está em caso de erro
       } finally {
         setDeletingId(null)
       }
@@ -95,140 +106,130 @@ export function Layout() {
   ]
 
   return (
-    <div className="flex h-screen bg-background">
-      <div className="w-64 border-r border-border bg-card flex flex-col">
-        <div className="p-3 border-b border-border space-y-2">
-          <div className="flex items-center justify-between">
-            <h1 className="text-lg font-bold text-foreground">Lain</h1>
+    <SidebarProvider className="h-svh overflow-hidden">
+      <Sidebar variant="sidebar" collapsible="icon">
+        <SidebarHeader>
+          <div className="px-2 pt-2">
+            <h1 className="text-lg font-bold text-foreground group-data-[collapsible=icon]:hidden">Lain</h1>
           </div>
-          <Select value={model} onValueChange={setModel}>
-            <SelectTrigger className="h-7 text-xs w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {models.map((m) => (
-                <SelectItem key={m} value={m} className="text-xs">
-                  {m}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+          <div className="px-2 pb-1 group-data-[collapsible=icon]:hidden">
+            <Select value={model} onValueChange={setModel}>
+              <SelectTrigger className="h-7 w-full text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {models.map((m) => (
+                  <SelectItem key={m} value={m} className="text-xs">
+                    {m}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </SidebarHeader>
 
-        <nav className="p-2 space-y-0.5">
-          {navItems.map(({ path, label, icon: Icon }) => (
-            <Link
-              key={path}
-              to={path}
-              className={cn(
-                'flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
-                location.pathname === path
-                  ? 'bg-primary/10 text-primary font-medium'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-              )}
-            >
-              <Icon className="w-4 h-4" />
-              {label}
-            </Link>
-          ))}
-        </nav>
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {navItems.map(({ path, label, icon: Icon }) => (
+                  <SidebarMenuItem key={path}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={location.pathname === path}
+                      tooltip={label}
+                    >
+                      <Link to={path}>
+                        <Icon />
+                        <span>{label}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
 
-        <div className="flex-1 flex flex-col overflow-hidden">
           {location.pathname === '/' && (
-            <>
-              <div className="px-3 py-2 flex items-center justify-between">
-                <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  Sessions
-                </h2>
-              </div>
-              <ScrollArea className="flex-1 px-2">
-                <div className="space-y-0.5">
+            <SidebarGroup>
+              <SidebarGroupLabel>Sessions</SidebarGroupLabel>
+              <SidebarGroupAction
+                title="New conversation"
+                onClick={async () => {
+                  await chat.clearSession()
+                  await refreshSessions()
+                  if (location.pathname !== '/') navigate('/')
+                }}
+              >
+                <Plus />
+              </SidebarGroupAction>
+              <SidebarGroupContent>
+                <SidebarMenu>
                   {sessions.length === 0 ? (
-                    <p className="px-2 py-1 text-xs text-muted-foreground">No sessions</p>
+                    <p className="px-2 py-1 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
+                      No sessions
+                    </p>
                   ) : (
                     sessions.map((s) => (
-                      <div
-                        key={s.id}
-                        onClick={() => {
-                          chat.switchSession(s.id)
-                          void refreshSessions()
-                        }}
-                        className={cn(
-                          'group relative px-2 py-1.5 rounded text-xs cursor-pointer transition-colors flex items-center',
-                          s.id === chat.sessionId
-                            ? 'bg-primary/10 text-primary font-medium'
-                            : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-                        )}
-                        title={s.preview || s.id}
-                      >
-                        <span className="min-w-0 flex-1 truncate pr-7">
-                          {s.preview || 'New conversation'}
-                        </span>
-                        <div className="absolute top-1/2 right-1 -translate-y-1/2 shrink-0">
-                          <button
-                            type="button"
-                            aria-label="Opções da conversa"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              if (menu?.id === s.id) {
-                                setMenu(null)
-                                return
-                              }
-                              const rect = e.currentTarget.getBoundingClientRect()
-                              const menuHeight = 48
-                              const top =
-                                rect.bottom + 4 + menuHeight > window.innerHeight
-                                  ? rect.top - menuHeight - 4
-                                  : rect.bottom + 4
-                              setMenu({
-                                id: s.id,
-                                top,
-                                right: window.innerWidth - rect.right,
-                              })
-                            }}
-                            className="p-0.5 rounded hover:bg-accent-foreground/10 text-muted-foreground hover:text-foreground transition-colors"
-                          >
-                            <MoreHorizontal className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
+                      <SidebarMenuItem key={s.id}>
+                        <SidebarMenuButton
+                          isActive={s.id === chat.sessionId}
+                          tooltip={s.preview || s.id}
+                          className="data-[active=true]:bg-foreground/5 data-[active=true]:font-normal"
+                          onClick={() => {
+                            chat.switchSession(s.id)
+                            void refreshSessions()
+                          }}
+                        >
+                          <span className="truncate">{s.preview || 'New conversation'}</span>
+                        </SidebarMenuButton>
+                        <SidebarMenuAction
+                          showOnHover
+                          aria-label="Opções da conversa"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (menu?.id === s.id) {
+                              setMenu(null)
+                              return
+                            }
+                            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                            const menuHeight = 48
+                            const top =
+                              rect.bottom + 4 + menuHeight > window.innerHeight
+                                ? rect.top - menuHeight - 4
+                                : rect.bottom + 4
+                            setMenu({
+                              id: s.id,
+                              top,
+                              right: window.innerWidth - rect.right,
+                            })
+                          }}
+                        >
+                          <MoreHorizontal />
+                        </SidebarMenuAction>
+                      </SidebarMenuItem>
                     ))
                   )}
-                </div>
-              </ScrollArea>
-
-              <div className="px-3 py-2 border-t border-border">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    await chat.clearSession()
-                    await refreshSessions()
-                    if (location.pathname !== '/') {
-                      navigate('/')
-                    }
-                  }}
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-                >
-                  <Plus className="w-3 h-3" />
-                  New conversation
-                </button>
-              </div>
-            </>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
           )}
-        </div>
+        </SidebarContent>
 
-        <div className="block border-t border-border p-3">
-          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
-            Memória ativa
-          </h2>
-          <p className="text-[11px] leading-relaxed text-muted-foreground">
-            Cada conversa consulta suas memórias antes de responder e salva o
-            que importa depois. Veja tudo em Memórias.
-          </p>
-        </div>
-      </div>
+        <SidebarFooter>
+          <div className="p-2 group-data-[collapsible=icon]:hidden">
+            <h2 className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Memória ativa
+            </h2>
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              Cada conversa consulta suas memórias antes de responder e salva o
+              que importa depois. Veja tudo em Memórias.
+            </p>
+          </div>
+        </SidebarFooter>
+      </Sidebar>
 
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <SidebarInset className="min-h-0 overflow-hidden">
         <Outlet
           context={{
             model,
@@ -239,7 +240,8 @@ export function Layout() {
             stopGenerating: chat.stopGenerating,
           } satisfies LayoutContext}
         />
-      </div>
+      </SidebarInset>
+
       {menu &&
         createPortal(
           <div
@@ -253,12 +255,12 @@ export function Layout() {
               onClick={() => void handleDeleteSession(menu.id)}
               className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-destructive hover:bg-accent disabled:opacity-50"
             >
-              <Trash2 className="w-3.5 h-3.5" />
+              <Trash2 className="h-3.5 w-3.5" />
               {deletingId === menu.id ? 'Apagando...' : 'Apagar'}
             </button>
           </div>,
           document.body
         )}
-    </div>
+    </SidebarProvider>
   )
 }
