@@ -15,6 +15,7 @@
  *   LAIN_LLM_API_KEY     — chave (fallback OPENROUTER_API_KEY, AI_GATEWAY_API_KEY)
  *   LAIN_LLM_MODEL       — modelo default (default deepseek/deepseek-v4-flash)
  *   LAIN_CHAT_PROJECT    — escopo de projeto das memórias (default '' = global)
+ *   LAIN_GRAPH_AUTO      — 'on' (default) injeta [GRAFO] em paralelo; 'off' volta a só on-demand via tool
 + *   SESSIONS_DIR           — diretório das sessões em disco (default server/data/sessions)
  *
  * Uso: bun run server/server.ts
@@ -57,6 +58,8 @@ const LLM_KEY = process.env.LAIN_LLM_API_KEY
   || '';
 const DEFAULT_MODEL = process.env.LAIN_LLM_MODEL || 'z-ai/glm-5.3-flash';
 const CHAT_PROJECT = process.env.LAIN_CHAT_PROJECT || '';
+const GRAPH_AUTO_OFF = ['off', '0', 'false', 'no'].includes((process.env.LAIN_GRAPH_AUTO ?? 'on').toLowerCase());
+const GRAPH_AUTO = !GRAPH_AUTO_OFF;
 const FRONTEND_DIST = process.env.FRONTEND_DIST || join(_dir, '..', 'dist');
 const SESSIONS_DIR = process.env.SESSIONS_DIR || join(_dir, 'data', 'sessions');
 
@@ -233,12 +236,40 @@ async function recallMemories(query: string): Promise<MemoryHit[]> {
   }
 }
 
-function buildMemoryBlock(hits: MemoryHit[]): string {
+function buildMemoryBlock(hits: MemoryHit[], graphMd?: string): string {
   const parts: string[] = [];
   if (hits.length > 0) {
     parts.push('[MEMORIAS RELEVANTES]\n' + hits.map(h => `- ${h.memory}`).join('\n'));
   }
+  const g = (graphMd ?? '').trim();
+  if (g) {
+    parts.push('[GRAFO]\n' + g.slice(0, 1500));
+  }
   return parts.join('\n\n');
+}
+
+/** Heurística barata: pula o grafo em smalltalk/saudação (economiza latência). Default = consulta. */
+function shouldQueryGraph(query: string): boolean {
+  if (!GRAPH_AUTO) return false;
+  const q = query.trim().toLowerCase();
+  if (q.length < 3) return false;
+  if (/^(oi|olá|ola|bom dia|boa tarde|boa noite|obrigad[oa]|valeu|tchau|ok|certo|entendi|beleza)[!.\s]*$/.test(q)) return false;
+  return true;
+}
+
+/** Best-effort: busca contexto do grafo em paralelo com o recall. Nunca quebra o chat. */
+async function queryGraph(query: string): Promise<string> {
+  if (!shouldQueryGraph(query)) return '';
+  const t0 = Date.now();
+  try {
+    const data = await fetchJson(`${MEMORY_URL}/api/graph/query`, { query, depth: 2, maxNodes: 8 }, 4000);
+    const md = typeof data?.markdown === 'string' ? data.markdown.trim() : '';
+    if (md) console.log(`[bff] graph hit (${Date.now() - t0}ms, ${md.length} chars)`);
+    return md ? md.slice(0, 1500) : '';
+  } catch (err) {
+    console.error('[bff] graph query failed (following without graph):', err instanceof Error ? err.message : err);
+    return '';
+  }
 }
 
 /** Fire-and-forget: salva o turno na memória (modo bundle = resumo, com dedup). */
@@ -466,10 +497,10 @@ async function callLlmStream(
 // ─── Chat processing ───
 
 async function processMessage(session: Session, userMessage: string, signal?: AbortSignal): Promise<void> {
-  // 1. Recall automático só de memórias (com cache). Grafo é on-demand via tool graph_query.
-  const hits = await recallMemories(userMessage);
+  // 1. Hybrid paralelo: recall (vetor) + grafo. Grafo é best-effort, nunca bloqueia.
+  const [hits, graphMd] = await Promise.all([recallMemories(userMessage), queryGraph(userMessage)]);
   if (signal?.aborted) return;
-  const memBlock = buildMemoryBlock(hits);
+  const memBlock = buildMemoryBlock(hits, graphMd);
 
   // 2. Monta contexto: system + memórias + histórico recente (sem acumular no session)
   const history = session.messages.filter(m => m.role !== 'system').slice(-20);
