@@ -225,7 +225,7 @@ interface MemoryHit { id: string; memory: string; score?: number }
 async function recallMemories(query: string): Promise<MemoryHit[]> {
   try {
     const data = await fetchJson(`${MEMORY_URL}/api/memory/recall`,
-      { query, project: CHAT_PROJECT || undefined, limit: 8 });
+      { query, project: CHAT_PROJECT || undefined, limit: 8, cached: true });
     return Array.isArray(data) ? data : [];
   } catch (err) {
     console.error('[bff] recall failed (following without memory):', err instanceof Error ? err.message : err);
@@ -233,22 +233,10 @@ async function recallMemories(query: string): Promise<MemoryHit[]> {
   }
 }
 
-async function queryGraph(query: string): Promise<string> {
-  try {
-    const data = await fetchJson(`${MEMORY_URL}/api/graph/query`, { query, depth: 2, maxNodes: 8 });
-    return typeof data?.markdown === 'string' ? data.markdown : '';
-  } catch {
-    return '';
-  }
-}
-
-function buildMemoryBlock(hits: MemoryHit[], graphMd: string): string {
+function buildMemoryBlock(hits: MemoryHit[]): string {
   const parts: string[] = [];
   if (hits.length > 0) {
     parts.push('[MEMORIAS RELEVANTES]\n' + hits.map(h => `- ${h.memory}`).join('\n'));
-  }
-  if (graphMd.trim()) {
-    parts.push('[GRAFO]\n' + graphMd.slice(0, 2000));
   }
   return parts.join('\n\n');
 }
@@ -478,10 +466,10 @@ async function callLlmStream(
 // ─── Chat processing ───
 
 async function processMessage(session: Session, userMessage: string, signal?: AbortSignal): Promise<void> {
-  // 1. Recall (best-effort, não bloqueia o chat se :3341 estiver fora)
-  const [hits, graphMd] = await Promise.all([recallMemories(userMessage), queryGraph(userMessage)]);
+  // 1. Recall automático só de memórias (com cache). Grafo é on-demand via tool graph_query.
+  const hits = await recallMemories(userMessage);
   if (signal?.aborted) return;
-  const memBlock = buildMemoryBlock(hits, graphMd);
+  const memBlock = buildMemoryBlock(hits);
 
   // 2. Monta contexto: system + memórias + histórico recente (sem acumular no session)
   const history = session.messages.filter(m => m.role !== 'system').slice(-20);
