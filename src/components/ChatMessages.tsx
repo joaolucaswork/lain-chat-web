@@ -10,11 +10,12 @@ import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Streamdown } from 'streamdown'
-import { ArrowDown, Check, Copy } from 'lucide-react'
+import { ArrowDown, Check, Copy, RotateCcw } from 'lucide-react'
 
 interface ChatMessagesProps {
   messages: ChatMessage[]
   processing: boolean
+  onRetry?: () => void
 }
 
 function CopyAction({ text }: { text: string }) {
@@ -43,10 +44,22 @@ function CopyAction({ text }: { text: string }) {
   )
 }
 
-export function ChatMessages({ messages, processing }: ChatMessagesProps) {
+export function ChatMessages({ messages, processing, onRetry }: ChatMessagesProps) {
   const viewportRef = useRef<HTMLDivElement>(null)
   const stickRef = useRef(true)
   const [showJump, setShowJump] = useState(false)
+
+  // Último user sem resposta (ex: erro aconteceu e a página foi recarregada,
+  // limpando o balão de erro que não é persistido) — oferece retry.
+  let lastUserIdx = -1
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === 'user') {
+      lastUserIdx = i
+      break
+    }
+  }
+  const lastUserUnanswered =
+    lastUserIdx !== -1 && lastUserIdx === messages.length - 1 && !processing
 
   const isNearBottom = () => {
     const el = viewportRef.current
@@ -123,6 +136,23 @@ export function ChatMessages({ messages, processing }: ChatMessagesProps) {
                         </BubbleContent>
                       </Bubble>
                     </MessageContent>
+                    {onRetry && !processing && (
+                      <MessageFooter>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon-xs"
+                              aria-label="Tentar de novo"
+                              onClick={onRetry}
+                            >
+                              <RotateCcw />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Tentar de novo</TooltipContent>
+                        </Tooltip>
+                      </MessageFooter>
+                    )}
                   </Message>
                 </div>
               )
@@ -145,6 +175,14 @@ export function ChatMessages({ messages, processing }: ChatMessagesProps) {
               </div>
             )
           })}
+          {lastUserUnanswered && onRetry && (
+            <div className="flex justify-start">
+              <Button variant="outline" size="sm" onClick={onRetry}>
+                <RotateCcw />
+                Tentar de novo
+              </Button>
+            </div>
+          )}
           {processing && (
             <div>
               <Message align="start">

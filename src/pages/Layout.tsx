@@ -35,6 +35,7 @@ export interface LayoutContext {
   processing: boolean
   status: string
   sendMessage: (text: string) => Promise<void> | void
+  retryLast: () => Promise<void> | void
   stopGenerating: () => Promise<void>
 }
 
@@ -237,6 +238,7 @@ export function Layout() {
             processing: chat.processing,
             status: chat.status,
             sendMessage: chat.sendMessage,
+            retryLast: chat.retryLast,
             stopGenerating: chat.stopGenerating,
           } satisfies LayoutContext}
         />

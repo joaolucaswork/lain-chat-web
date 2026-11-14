@@ -7,7 +7,7 @@ import type { LayoutContext } from './Layout'
 
 export function ChatPage() {
   const ctx = useOutletContext<LayoutContext>()
-  const { messages, processing, status, sendMessage, stopGenerating } = ctx
+  const { messages, processing, status, sendMessage, retryLast, stopGenerating } = ctx
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -24,7 +24,7 @@ export function ChatPage() {
         </div>
       </div>
 
-      <ChatMessages messages={messages} processing={processing} />
+      <ChatMessages messages={messages} processing={processing} onRetry={retryLast} />
       <ChatInput onSend={sendMessage} onStop={stopGenerating} disabled={processing} placeholder="Send a message..." />
     </div>
   )

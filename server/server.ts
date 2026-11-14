@@ -404,6 +404,21 @@ async function execLlmTool(tc: LlmToolCall): Promise<string> {
   return `Error: unknown tool "${tc.name}"`;
 }
 
+function extractStreamText(node: any): string {
+  if (node == null) return '';
+  if (typeof node === 'string') return node;
+  if (Array.isArray(node)) {
+    // Blocos tipo [{type:'text',text:'...'}] (alguns providers via OpenRouter)
+    return node.map((b) => {
+      if (typeof b === 'string') return b;
+      if (b && typeof b.text === 'string') return b.text;
+      if (b && typeof b.content === 'string') return b.content;
+      return '';
+    }).join('');
+  }
+  return '';
+}
+
 async function callLlmStream(
   messages: Array<Record<string, unknown>>,
   model: string,
@@ -445,6 +460,7 @@ async function callLlmStream(
   }
   if (!res.ok) {
     const errBody = await res.text().catch(() => '');
+    clearTimeout(timer);
     throw new Error(`LLM ${res.status}: ${errBody.slice(0, 300)}`);
   }
   const reader = res.body?.getReader();
@@ -452,9 +468,14 @@ async function callLlmStream(
   const decoder = new TextDecoder();
   let buffer = '';
   let content = '';
+  let reasoningChars = 0;
+  const finishReasons: string[] = [];
+  let streamError: string | null = null;
+  let lastRaw = '';
   const toolParts = new Map<number, { id: string; name: string; args: string }>();
+  let streamDone = false;
   try {
-  while (true) {
+  while (!streamDone) {
     if (ctrl.signal.aborted) {
       throw new Error(signal?.aborted ? 'STOPPED' : 'LLM timeout (120s por turno)');
     }
@@ -467,19 +488,38 @@ async function callLlmStream(
       const t = line.trim();
       if (!t || !t.startsWith('data:')) continue;
       const data = t.slice(5).trim();
-      if (data === '[DONE]') break;
-      try {
-        const delta = JSON.parse(data)?.choices?.[0]?.delta;
-        if (delta?.content) { content += delta.content; onToken(delta.content); }
-        for (const tc of (delta?.tool_calls ?? []) as Array<{ index?: number; id?: string; function?: { name?: string; arguments?: string } }>) {
-          const idx = tc.index ?? 0;
-          let part = toolParts.get(idx);
-          if (!part) { part = { id: '', name: '', args: '' }; toolParts.set(idx, part); }
-          if (tc.id) part.id += tc.id;
-          if (tc.function?.name) part.name += tc.function.name;
-          if (tc.function?.arguments) part.args += tc.function.arguments;
-        }
-      } catch { /* skip */ }
+      if (data === '[DONE]') { streamDone = true; break; }
+      let parsed: any;
+      try { parsed = JSON.parse(data); } catch { continue; }
+      // OpenRouter pode entregar erro no meio do stream (ex provider indisponível)
+      if (parsed?.error) {
+        const msg = typeof parsed.error === 'string' ? parsed.error : (parsed.error?.message ?? JSON.stringify(parsed.error));
+        streamError = String(msg).slice(0, 500);
+        continue;
+      }
+      const choice = parsed?.choices?.[0];
+      if (!choice) continue;
+      if (choice.finish_reason) finishReasons.push(String(choice.finish_reason));
+      if (choice.native_finish_reason && choice.native_finish_reason !== choice.finish_reason) {
+        finishReasons.push(`native:${choice.native_finish_reason}`);
+      }
+      const delta = choice.delta ?? choice.message ?? {};
+      // reasoning (GLM/Zhipu e outros thinking models mandam antes do content) — não é resposta
+      const reasoning =
+        (typeof delta.reasoning_content === 'string' ? delta.reasoning_content : '') +
+        (typeof delta.reasoning === 'string' ? delta.reasoning : '');
+      if (reasoning) reasoningChars += reasoning.length;
+      const text = extractStreamText(delta.content ?? delta.text);
+      if (text) { content += text; onToken(text); }
+      for (const tc of (delta?.tool_calls ?? []) as Array<{ index?: number; id?: string; function?: { name?: string; arguments?: string } }>) {
+        const idx = tc.index ?? 0;
+        let part = toolParts.get(idx);
+        if (!part) { part = { id: '', name: '', args: '' }; toolParts.set(idx, part); }
+        if (tc.id) part.id += tc.id;
+        if (tc.function?.name) part.name += tc.function.name;
+        if (tc.function?.arguments) part.args += tc.function.arguments;
+      }
+      lastRaw = data.slice(0, 300);
     }
   }
   } finally {
@@ -489,9 +529,43 @@ async function callLlmStream(
   const toolCalls = [...toolParts.values()]
     .filter(p => p.id && p.name)
     .map(p => ({ id: p.id, name: p.name, args: p.args }));
-  clearTimeout(timer);
-  if (!content && toolCalls.length === 0) throw new Error('LLM returned empty response');
+  if (streamError && !content && toolCalls.length === 0) {
+    throw new Error(`LLM stream error: ${streamError}`);
+  }
+  if (!content && toolCalls.length === 0) {
+    console.error(`[bff] empty LLM response (model=${model} finish=[${finishReasons.join(',')}] reasoningChars=${reasoningChars} last=${lastRaw})`);
+    throw new Error('EMPTY_LLM_RESPONSE');
+  }
   return { content, toolCalls };
+}
+
+/** Retry curto p/ respostas vazias transitórias (thinking models via OpenRouter às vezes voltam vazios). */
+async function callLlmStreamWithRetry(
+  messages: Array<Record<string, unknown>>,
+  model: string,
+  tools: Array<Record<string, unknown>>,
+  onToken: (t: string) => void,
+  signal?: AbortSignal,
+  attempts = 2,
+): Promise<{ content: string; toolCalls: LlmToolCall[] }> {
+  let lastErr: unknown = null;
+  for (let i = 0; i < attempts; i++) {
+    if (signal?.aborted) throw new Error('STOPPED');
+    // Tokens já streamados pertencem à tentativa falha — avisa a UI para descartar o balão vazio.
+    // (processMessage só faz broadcast de token em tentativas com conteúdo, então retry é seguro.)
+    try {
+      return await callLlmStream(messages, model, tools, onToken, signal);
+    } catch (err) {
+      lastErr = err;
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg === 'STOPPED' || msg === 'LLM timeout (120s por turno)') throw err;
+      const retryable = msg === 'EMPTY_LLM_RESPONSE' || msg.startsWith('LLM stream error') || msg.startsWith('LLM 5');
+      if (!retryable || i === attempts - 1) throw err;
+      console.warn(`[bff] LLM empty/transient (tentativa ${i + 1}/${attempts}), retrying...`);
+      await new Promise(r => setTimeout(r, 600 * (i + 1)));
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error('EMPTY_LLM_RESPONSE');
 }
 
 // ─── Chat processing ───
@@ -514,7 +588,7 @@ async function processMessage(session: Session, userMessage: string, signal?: Ab
   let streamed = false;
   let finalText = '';
   for (let turn = 0; turn < 3; turn++) {
-    const { content, toolCalls } = await callLlmStream(apiMessages, session.model, MEM_TOOLS, (token) => {
+    const { content, toolCalls } = await callLlmStreamWithRetry(apiMessages, session.model, MEM_TOOLS, (token) => {
       streamed = true;
       broadcast(session.id, 'token', { text: token });
     }, signal);
@@ -550,26 +624,62 @@ async function processMessage(session: Session, userMessage: string, signal?: Ab
 
 interface VaultMemory { id: string; file: string; project: string; tags: string[]; created: string; preview: string }
 
-async function listVaultMemories(): Promise<VaultMemory[]> {
-  const scopes = [{ project: undefined as string | undefined, label: 'global' },
-    ...(CHAT_PROJECT ? [{ project: CHAT_PROJECT, label: CHAT_PROJECT }] : [])];
-  const out: VaultMemory[] = [];
-  for (const s of scopes) {
-    try {
-      const data = await fetchJson(`${MEMORY_URL}/api/memory/list`, { project: s.project, limit: 200 });
-      for (const m of (Array.isArray(data) ? data : [])) {
-        const body: string = m.memory ?? '';
-        out.push({
-          id: m.id, file: '', project: s.label, tags: [],
-          created: m.created_at ?? '',
-          preview: body.slice(0, 200) + (body.length > 200 ? '...' : ''),
-        });
+async function discoverMemoryProjects(): Promise<string[]> {
+  try {
+    const res = await fetch(`${MEMORY_URL}/api/graph/nodes`, { headers: memGetHeaders(), signal: AbortSignal.timeout(5000) });
+    if (!res.ok) return [];
+    const nodes = (await res.json()) as Array<{ id: string; type: string }>;
+    const seen = new Set<string>();
+    for (const n of nodes) {
+      if (n?.type === 'Project' && typeof n.id === 'string' && n.id.trim()) {
+        seen.add(n.id.trim());
       }
-    } catch (err) {
-      console.error('[bff] vault memories failed:', err instanceof Error ? err.message : err);
-      throw err;
     }
+    // CHAT_PROJECT explícito sempre incluído (pode ainda não ter nó no grafo)
+    if (CHAT_PROJECT && !seen.has(CHAT_PROJECT)) seen.add(CHAT_PROJECT);
+    return [...seen];
+  } catch {
+    return CHAT_PROJECT ? [CHAT_PROJECT] : [];
   }
+}
+
+async function listVaultMemories(): Promise<VaultMemory[]> {
+  const out: VaultMemory[] = [];
+  const seenIds = new Set<string>();
+  const pushBatch = (items: any[], projectLabel: string) => {
+    for (const m of (Array.isArray(items) ? items : [])) {
+      if (!m?.id || seenIds.has(m.id)) continue;
+      seenIds.add(m.id);
+      const body: string = m.memory ?? '';
+      out.push({
+        id: m.id, file: '', project: projectLabel, tags: [],
+        created: m.created_at ?? '',
+        preview: body.slice(0, 200) + (body.length > 200 ? '...' : ''),
+      });
+    }
+  };
+  // 1. Global (sem filtro de projeto)
+  try {
+    const data = await fetchJson(`${MEMORY_URL}/api/memory/list`, { limit: 200 });
+    pushBatch(data, 'global');
+  } catch (err) {
+    console.error('[bff] vault memories failed (global):', err instanceof Error ? err.message : err);
+    throw err;
+  }
+  // 2. Cada projeto descoberto via grafo (ex: 'percurso', 'lain-memory').
+  //    O lain-memory não tem endpoint que lista projetos, então o grafo
+  //    (nós type=Project) é a fonte da verdade. Falhas por projeto (ex 500
+  //    em nomes com espaço) são ignoradas — não podem derrubar a página.
+  const projects = await discoverMemoryProjects();
+  await Promise.all(projects.map(async (p) => {
+    if (!p || p === 'global') return;
+    try {
+      const data = await fetchJson(`${MEMORY_URL}/api/memory/list`, { project: p, limit: 200 });
+      pushBatch(data, p);
+    } catch (err) {
+      console.error(`[bff] vault memories failed (project=${p}):`, err instanceof Error ? err.message : err);
+    }
+  }));
   return out;
 }
 
@@ -656,12 +766,70 @@ Bun.serve({
         if (err instanceof Error && (err.message === 'STOPPED' || abortCtrl.signal.aborted)) {
           broadcast(sessionId, 'token_end', { text: '' });
         } else {
-          broadcast(sessionId, 'server_error', { message: err instanceof Error ? err.message : String(err) });
+          const raw = err instanceof Error ? err.message : String(err);
+          const friendly = raw === 'EMPTY_LLM_RESPONSE'
+            ? 'O modelo voltou vazio agora (falha transitória do provedor). Tente enviar de novo ou reformule a pergunta.'
+            : raw.startsWith('LLM stream error')
+              ? 'O provedor do modelo falhou no meio da resposta. Tente de novo em alguns segundos.'
+              : raw;
+          console.error(`[bff] chat failed (session=${sessionId}):`, raw);
+          broadcast(sessionId, 'server_error', { message: friendly });
         }
         broadcast(sessionId, 'done', {});
       }).finally(() => abortCtrls.delete(sessionId));
 
       return json({ sessionId });
+    }
+
+    // ── Retry last turn ──
+    // Re-executa o LLM para a última mensagem do usuário SEM duplicá-la
+    // no histórico (o POST /api/chat normal sempre faz push de user).
+    // Usado pelo botão "Tentar de novo" após server_error.
+    function runTurn(sessionId: string, session: Session, userMessage: string): void {
+      broadcast(sessionId, 'processing_start', { model: session.model });
+      const abortCtrl = new AbortController();
+      abortCtrls.set(sessionId, abortCtrl);
+      processMessage(session, userMessage, abortCtrl.signal).catch(err => {
+        if (err instanceof Error && (err.message === 'STOPPED' || abortCtrl.signal.aborted)) {
+          broadcast(sessionId, 'token_end', { text: '' });
+        } else {
+          const raw = err instanceof Error ? err.message : String(err);
+          const friendly = raw === 'EMPTY_LLM_RESPONSE'
+            ? 'O modelo voltou vazio agora (falha transitória do provedor). Tente enviar de novo ou reformule a pergunta.'
+            : raw.startsWith('LLM stream error')
+              ? 'O provedor do modelo falhou no meio da resposta. Tente de novo em alguns segundos.'
+              : raw;
+          console.error(`[bff] chat failed (session=${sessionId}):`, raw);
+          broadcast(sessionId, 'server_error', { message: friendly });
+        }
+        broadcast(sessionId, 'done', {});
+      }).finally(() => abortCtrls.delete(sessionId));
+    }
+
+    if (req.method === 'POST' && path === '/api/chat/retry') {
+      const sessionId = params.get('sessionId');
+      if (!sessionId) return json({ error: 'sessionId required' }, 400);
+      const session = sessions.get(sessionId);
+      if (!session) return json({ error: 'session not found' }, 404);
+      if (abortCtrls.has(sessionId)) return json({ error: 'already processing' }, 409);
+      let body: Record<string, unknown> = {};
+      try { body = await req.json(); } catch { /* corpo opcional (só model) */ }
+      if (typeof body.model === 'string' && body.model) session.model = body.model;
+      // Última mensagem do usuário no histórico persistido
+      let lastUser = -1;
+      for (let i = session.messages.length - 1; i >= 0; i--) {
+        const m = session.messages[i];
+        if (m.role === 'user' && m.content?.trim()) { lastUser = i; break; }
+      }
+      if (lastUser === -1) return json({ error: 'no user message to retry' }, 400);
+      // Descarta respostas de tentativas anteriores (regenerar não empilha
+      // assistants; turno falho não tem nada após o user — no-op).
+      if (lastUser < session.messages.length - 1) {
+        session.messages = session.messages.slice(0, lastUser + 1);
+        persistSession(session);
+      }
+      runTurn(sessionId, session, session.messages[lastUser].content as string);
+      return json({ sessionId, retried: true });
     }
 
     // ── Stop ──
@@ -740,7 +908,8 @@ Bun.serve({
         const all = await listVaultMemories();
         const found = all.find(m => m.id === id);
         if (!found) return json({ error: 'not found' }, 404);
-        const full = await fetchJson(`${MEMORY_URL}/api/memory/list`, { limit: 500 })
+        const scope = found.project === 'global' ? {} : { project: found.project };
+        const full = await fetchJson(`${MEMORY_URL}/api/memory/list`, { ...scope, limit: 500 })
           .then((d: any[]) => (Array.isArray(d) ? d : []).find((m: any) => m.id === id))
           .catch(() => null);
         return json({ id: found.id, project: found.project, created: found.created, file: '', tags: [], body: full?.memory ?? found.preview });

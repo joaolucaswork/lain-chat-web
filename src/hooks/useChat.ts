@@ -114,6 +114,50 @@ export function useChat(model: string) {
     setStatus('Ready')
   }, [sessionId])
 
+  const retryLast = useCallback(async () => {
+    if (processing) return
+    // Descarta o estado parcial do turno falho (erros + resposta incompleta
+    // após o último user) e re-executa o LLM no servidor sem duplicar
+    // a mensagem do usuário.
+    let lastUser = -1
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') {
+        lastUser = i
+        break
+      }
+    }
+    if (lastUser === -1) return
+    setMessages((prev) => {
+      // `prev` pode ter avançado desde o clique; recorta após o último user
+      // do estado atual para não apagar mensagem nova.
+      let u = -1
+      for (let i = prev.length - 1; i >= 0; i--) {
+        if (prev[i].role === 'user') {
+          u = i
+          break
+        }
+      }
+      if (u === -1) return prev
+      return prev.slice(0, u + 1)
+    })
+    try {
+      const res = await fetch(`/api/chat/retry?sessionId=${sessionId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setMessages((prev) => [
+          ...prev,
+          { role: 'system', content: `Error: ${(data as { error?: string }).error || 'retry failed'}` },
+        ])
+      }
+    } catch {
+      setMessages((prev) => [...prev, { role: 'system', content: 'Error: retry failed' }])
+    }
+  }, [sessionId, processing, model, messages])
+
   const loadMessages = useCallback(async (sid: string) => {
     const requestedSid = sid
 
@@ -175,6 +219,7 @@ export function useChat(model: string) {
     status,
     sessionId,
     sendMessage,
+    retryLast,
     stopGenerating,
     switchSession,
     clearSession,
