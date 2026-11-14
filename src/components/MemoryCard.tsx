@@ -6,6 +6,14 @@ interface MemoryCardProps {
   onClick: (id: string) => void
 }
 
+const timeFmt = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' })
+
+function formatTime(iso: string) {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso || ''
+  return timeFmt.format(d)
+}
+
 export function MemoryCard({ memory, onClick }: MemoryCardProps) {
   const tags = (memory.tags || []).slice(0, 5)
 
@@ -18,7 +26,7 @@ export function MemoryCard({ memory, onClick }: MemoryCardProps) {
         {memory.preview.slice(0, 70)}{memory.preview.length > 70 ? '...' : ''}
       </div>
       <div className="flex gap-3 text-xs text-muted-foreground mb-1">
-        <span>{memory.created || ''}</span>
+        <span>{formatTime(memory.created)}</span>
         <span>{memory.project}</span>
       </div>
       <div className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">

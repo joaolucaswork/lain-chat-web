@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useMemories } from '@/hooks/useMemories'
+import type { Memory } from '@/types'
 import { MemoryCard } from '@/components/MemoryCard'
 import { MemoryDetail } from '@/components/MemoryDetail'
 import { GraphDetail } from '@/components/GraphDetail'
@@ -8,6 +9,26 @@ import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
+
+const monthFmt = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' })
+const dayFmt = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })
+
+function capitalize(s: string) {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s
+}
+
+interface DayGroup {
+  key: string
+  label: string
+  count: number
+  items: Memory[]
+}
+
+interface MonthGroup {
+  key: string
+  label: string
+  days: DayGroup[]
+}
 
 export function MemoriesPage() {
   const { memories, graphNodes, loading, error, load, getMemory, getGraphNode } = useMemories()
@@ -36,6 +57,51 @@ export function MemoriesPage() {
     }
     return f
   }, [memories, activeProject, activeTag, search])
+
+  const grouped = useMemo<MonthGroup[]>(() => {
+    const sorted = [...filtered].sort((a, b) => {
+      const ta = Date.parse(a.created || '')
+      const tb = Date.parse(b.created || '')
+      if (Number.isNaN(ta) && Number.isNaN(tb)) return 0
+      if (Number.isNaN(ta)) return 1
+      if (Number.isNaN(tb)) return -1
+      return tb - ta
+    })
+    const months: MonthGroup[] = []
+    let curM: MonthGroup | null = null
+    let curD: DayGroup | null = null
+    for (const m of sorted) {
+      const d = new Date(m.created)
+      const valid = !Number.isNaN(d.getTime())
+      const mKey = valid
+        ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+        : 'sem-data'
+      const dKey = valid
+        ? `${mKey}-${String(d.getDate()).padStart(2, '0')}`
+        : 'sem-data'
+      if (!curM || curM.key !== mKey) {
+        curM = {
+          key: mKey,
+          label: valid ? capitalize(monthFmt.format(d)) : 'Sem data',
+          days: [],
+        }
+        months.push(curM)
+        curD = null
+      }
+      if (!curD || curD.key !== dKey) {
+        curD = {
+          key: dKey,
+          label: valid ? capitalize(dayFmt.format(d)) : 'Sem data',
+          count: 0,
+          items: [],
+        }
+        curM.days.push(curD)
+      }
+      curD.items.push(m)
+      curD.count += 1
+    }
+    return months
+  }, [filtered])
 
   const projects = useMemo(
     () => [...new Set(memories.map((m) => m.project))].sort(),
@@ -146,16 +212,40 @@ export function MemoriesPage() {
           <span>{memories.length} memorias</span>
         </div>
         <ScrollArea className="flex-1 min-h-0">
-          <div className="p-3 space-y-2">
+          <div className="p-3">
             {loading ? (
               <div className="text-center text-muted-foreground py-8">carregando...</div>
             ) : (
-              filtered.map((m) => (
-                <MemoryCard
-                  key={m.id}
-                  memory={m}
-                  onClick={setSelectedMemoryId}
-                />
+              grouped.map((month) => (
+                <section key={month.key}>
+                  {month.days.map((day) => (
+                    <div key={day.key}>
+                      <div className="sticky top-0 z-10 -mx-3 bg-background px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold uppercase tracking-widest text-foreground">
+                            {month.label}
+                          </span>
+                          <span className="rounded-full bg-muted px-3 py-1 text-[13px] font-medium text-muted-foreground">
+                            {day.label}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {day.count}
+                          </span>
+                          <div className="h-px flex-1 bg-border/60" />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        {day.items.map((m) => (
+                          <MemoryCard
+                            key={m.id}
+                            memory={m}
+                            onClick={setSelectedMemoryId}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </section>
               ))
             )}
           </div>
