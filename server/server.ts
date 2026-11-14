@@ -14,7 +14,7 @@
  *   LAIN_LLM_BASE_URL    — endpoint OpenAI-compatible (default https://openrouter.ai/api/v1)
  *   LAIN_LLM_API_KEY     — chave (fallback OPENROUTER_API_KEY, AI_GATEWAY_API_KEY)
  *   LAIN_LLM_MODEL       — modelo default (default deepseek/deepseek-v4-flash)
- *   LAIN_CHAT_PROJECT    — escopo de projeto das memórias (default '' = global)
+ *   LAIN_CHAT_PROJECT    — escopo de projeto das memórias (default 'diario' = lucas:diario)
  *   LAIN_GRAPH_AUTO      — 'on' (default) injeta [GRAFO] em paralelo; 'off' volta a só on-demand via tool
 + *   SESSIONS_DIR           — diretório das sessões em disco (default server/data/sessions)
  *
@@ -57,7 +57,7 @@ const LLM_KEY = process.env.LAIN_LLM_API_KEY
   || process.env.AI_GATEWAY_API_KEY
   || '';
 const DEFAULT_MODEL = process.env.LAIN_LLM_MODEL || 'z-ai/glm-5.3-flash';
-const CHAT_PROJECT = process.env.LAIN_CHAT_PROJECT || '';
+const CHAT_PROJECT = process.env.LAIN_CHAT_PROJECT || 'diario';
 const GRAPH_AUTO_OFF = ['off', '0', 'false', 'no'].includes((process.env.LAIN_GRAPH_AUTO ?? 'on').toLowerCase());
 const GRAPH_AUTO = !GRAPH_AUTO_OFF;
 const FRONTEND_DIST = process.env.FRONTEND_DIST || join(_dir, '..', 'dist');
