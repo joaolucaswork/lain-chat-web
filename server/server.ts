@@ -365,11 +365,12 @@ async function recallMemories(query: string): Promise<MemoryHit[]> {
   }
 }
 
-/** Data de registro da memória (updated_at cai para created_at).
+/** Data de registro da memória (created_at; updated_at é manutenção/reconsolidação,
+ *  não novo relato — usar updated faria um fato de junho parecer "deste fim de semana").
  *  Usa `||` em vez de `??`: o recall às vezes devolve string vazia ou null,
  *  e nesses casos o `??` não faria o fallback e a data sumiria do bloco. */
 function memDate(m: { updated_at?: string | null; created_at?: string | null }): string {
-  const raw = String(m.updated_at || m.created_at || '').slice(0, 10);
+  const raw = String(m.created_at || m.updated_at || '').slice(0, 10);
   return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : '';
 }
 
@@ -403,7 +404,7 @@ function buildMemoryBlock(hits: MemoryHit[], graphMd?: string): string {
       const tag = proj ? (d ? `[${proj} ${d}]` : `[${proj}]`) : (d ? `[${d}]` : '');
       return `- ${tag ? `${tag} ` : ''}${h.memory}`;
     }).join('\n').slice(0, 4000);
-    parts.push(`[MEMORIAS RELEVANTES — hoje é ${today.long} (${today.iso}, America/Sao_Paulo), agora são ${today.time}; [projeto data] = escopo de origem + quando a memória foi salva. Regra temporal: "hoje/ontem/agora" da conversa = hoje; relativos dentro de cada memória ("ontem", "semana passada") = data da tag, nunca hoje.]\n` + body);
+    parts.push(`[MEMORIAS RELEVANTES — hoje é ${today.long} (${today.iso}, America/Sao_Paulo), agora são ${today.time}; [projeto data] = escopo + quando a memória foi SALVA, nunca quando o fato aconteceu. NUNCA use a data da tag como data do evento. Se o texto da memória não traz data explícita, o quando é desconhecido — não chute ("fim de semana", "recente"). Quando uma memória traz data explícita ("junho", "há 5 meses") ela prevalece sobre memórias sem data.]\n` + body);
   }
   const g = (graphMd ?? '').trim();
   if (g) {
