@@ -41,6 +41,8 @@ export function RecentMemories() {
   const [activeIdx, setActiveIdx] = useState(0)
   const [dragging, setDragging] = useState(false)
   const [menuId, setMenuId] = useState<string | null>(null)
+  const [justOpened, setJustOpened] = useState(true)
+  const openTimer = useRef<number | null>(null)
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try {
       return localStorage.getItem(COLLAPSED_HOME_KEY) === '1'
@@ -107,8 +109,10 @@ export function RecentMemories() {
   }, [])
 
   useEffect(() => {
+    openTimer.current = window.setTimeout(() => setJustOpened(false), 1100)
     return () => {
       if (undoTimer.current) window.clearTimeout(undoTimer.current)
+      if (openTimer.current) window.clearTimeout(openTimer.current)
     }
   }, [])
 
@@ -274,6 +278,11 @@ export function RecentMemories() {
             aria-label={collapsed ? 'Expandir memórias' : 'Recolher memórias'}
             aria-expanded={!collapsed}
             onClick={() => {
+              if (collapsed) {
+                setJustOpened(true)
+                if (openTimer.current) window.clearTimeout(openTimer.current)
+                openTimer.current = window.setTimeout(() => setJustOpened(false), 1100)
+              }
               setCollapsed((v) => {
                 try {
                   localStorage.setItem(COLLAPSED_HOME_KEY, v ? '0' : '1')
@@ -337,7 +346,17 @@ export function RecentMemories() {
       <motion.div
         initial={false}
         animate={{ height: collapsed ? 0 : 'auto', opacity: collapsed ? 0 : 1 }}
-        transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+        transition={
+          collapsed
+            ? {
+                height: { duration: 0.35, ease: [0.4, 0, 0.2, 1] },
+                opacity: { duration: 0.15, ease: 'easeOut' },
+              }
+            : {
+                height: { duration: 0.5, ease: [0.22, 1, 0.36, 1] },
+                opacity: { duration: 0.3, delay: 0.08 },
+              }
+        }
         className="overflow-hidden"
       >
       <div className="relative">
@@ -373,8 +392,8 @@ export function RecentMemories() {
               <motion.div
                 initial={{ opacity: 0, y: 8 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: false, amount: 0.5 }}
-                transition={{ duration: 0.35, delay: Math.min(idx, 5) * 0.06, ease: [0.22, 1, 0.36, 1] }}
+                viewport={{ once: false, amount: 0.3 }}
+                transition={{ duration: 0.35, delay: justOpened ? Math.min(idx, 5) * 0.06 : 0, ease: [0.22, 1, 0.36, 1] }}
                 onPointerDown={(e) => {
                   downPos.current = { x: e.clientX, y: e.clientY }
                 }}

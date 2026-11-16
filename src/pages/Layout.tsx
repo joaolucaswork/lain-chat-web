@@ -528,7 +528,7 @@ export function Layout() {
               x: historyCollapsed ? -16 : 0,
             }}
             transition={{ duration: 0.18, ease: 'easeOut' }}
-            className="flex h-full w-[260px] flex-col border-r border-sidebar-border"
+            className="flex h-full w-[260px] flex-col"
           >
             {chatsPanel(true)}
           </motion.div>

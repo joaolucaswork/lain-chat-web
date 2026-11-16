@@ -24,9 +24,11 @@ export function ChatPage() {
         >
           <List className="size-5" />
         </button>
-        <h1 className="flex-1 truncate text-left text-[15px] font-medium text-muted-foreground">
-          {sessionTitle || 'Nova conversa'}
-        </h1>
+        {sessionTitle || !isEmpty ? (
+          <h1 className="flex-1 truncate text-left text-[15px] font-medium text-muted-foreground">
+            {sessionTitle || 'Nova conversa'}
+          </h1>
+        ) : null}
       </div>
 
       {isEmpty ? (
