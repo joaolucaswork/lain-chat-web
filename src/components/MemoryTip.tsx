@@ -25,7 +25,7 @@ export function Tip({ tip, side = 'bottom', children }: TipProps) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>{children}</TooltipTrigger>
-      <TooltipContent side={side} className="max-w-[320px] duration-150">
+      <TooltipContent side={side} className="max-w-[90vw] duration-150">
         {FEEDBACK_TIPS[tip]}
       </TooltipContent>
     </Tooltip>
