@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { formatDateTime, cn } from '@/lib/utils'
 import type { Memory, FeedbackAction } from '@/types'
 import { feedbackOf } from '@/types'
+import { Tip } from '@/components/MemoryTip'
 import { Check, ClockCounterClockwise, X } from '@phosphor-icons/react'
 
 interface MemoryDetailProps {
@@ -115,34 +116,38 @@ export function MemoryDetail({ memoryId, onClose, getMemory, onVote, onForget, b
                   <div className="flex flex-wrap items-center gap-2">
                     {onVote && (
                       <>
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => onVote(data.id, 'confirm')}
-                          className={cn(
-                            'inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm transition-colors disabled:opacity-50',
-                            fb.confidence >= 1
-                              ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                              : 'border-border text-muted-foreground hover:text-emerald-600 hover:border-emerald-500/50'
-                          )}
-                        >
-                          <Check className="size-4" weight="bold" />
-                          {fb.confidence >= 1 ? 'Confirmada' : 'Correta'}
-                        </button>
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => onVote(data.id, fb.status === 'archived' ? 'unarchive' : 'archive')}
-                          className={cn(
-                            'inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm transition-colors disabled:opacity-50',
-                            fb.status === 'archived'
-                              ? 'border-amber-500/50 bg-amber-500/10 text-amber-600 dark:text-amber-400'
-                              : 'border-border text-muted-foreground hover:text-amber-600 hover:border-amber-500/50'
-                          )}
-                        >
-                          <ClockCounterClockwise className="size-4" />
-                          {fb.status === 'archived' ? 'Desarquivar' : 'Não é mais assim'}
-                        </button>
+                        <Tip tip="confirm" side="top">
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => onVote(data.id, 'confirm')}
+                            className={cn(
+                              'inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm transition-colors disabled:opacity-50',
+                              fb.confidence >= 1
+                                ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                                : 'border-border text-muted-foreground hover:text-emerald-600 hover:border-emerald-500/50'
+                            )}
+                          >
+                            <Check className="size-4" weight="bold" />
+                            {fb.confidence >= 1 ? 'Confirmada' : 'Correta'}
+                          </button>
+                        </Tip>
+                        <Tip tip={fb.status === 'archived' ? 'unarchive' : 'archive'} side="top">
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => onVote(data.id, fb.status === 'archived' ? 'unarchive' : 'archive')}
+                            className={cn(
+                              'inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm transition-colors disabled:opacity-50',
+                              fb.status === 'archived'
+                                ? 'border-amber-500/50 bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                                : 'border-border text-muted-foreground hover:text-amber-600 hover:border-amber-500/50'
+                            )}
+                          >
+                            <ClockCounterClockwise className="size-4" />
+                            {fb.status === 'archived' ? 'Desarquivar' : 'Não é mais assim'}
+                          </button>
+                        </Tip>
                       </>
                     )}
                     {onForget && (
@@ -166,15 +171,17 @@ export function MemoryDetail({ memoryId, onClose, getMemory, onVote, onForget, b
                           </button>
                         </span>
                       ) : (
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => setConfirmingForget(true)}
-                          className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-destructive hover:border-destructive/50 disabled:opacity-50"
-                        >
-                          <X className="size-4" weight="bold" />
-                          Esquecer
-                        </button>
+                        <Tip tip="forget" side="top">
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => setConfirmingForget(true)}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-destructive hover:border-destructive/50 disabled:opacity-50"
+                          >
+                            <X className="size-4" weight="bold" />
+                            Esquecer
+                          </button>
+                        </Tip>
                       )
                     )}
                   </div>

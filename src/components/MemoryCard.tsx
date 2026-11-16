@@ -4,6 +4,7 @@ import { feedbackOf } from '@/types'
 import { Badge } from '@/components/ui/badge'
 import { formatDateTime } from '@/lib/utils'
 import { cn } from '@/lib/utils'
+import { Tip } from '@/components/MemoryTip'
 import { Check, ClockCounterClockwise, X } from '@phosphor-icons/react'
 
 interface MemoryCardProps {
@@ -73,36 +74,38 @@ export function MemoryCard({ memory, onClick, onVote, onForget, busy }: MemoryCa
         >
           {onVote && (
             <>
-              <button
-                type="button"
-                title={fb.confidence >= 1 ? 'Confirmada' : 'Correta — protege do esquecimento'}
-                aria-label="Marcar como correta"
-                disabled={busy}
-                onClick={(e) => act(e, () => onVote(memory.id, 'confirm'))}
-                className={cn(
-                  'flex size-7 items-center justify-center rounded-md border transition-colors',
-                  fb.confidence >= 1
-                    ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                    : 'border-border bg-background text-muted-foreground hover:text-emerald-600 hover:border-emerald-500/50'
-                )}
-              >
-                <Check className="size-4" weight="bold" />
-              </button>
-              <button
-                type="button"
-                title={fb.status === 'archived' ? 'Voltar para ativas' : 'Não é mais assim — arquiva sem apagar'}
-                aria-label={fb.status === 'archived' ? 'Desarquivar' : 'Arquivar: não é mais assim'}
-                disabled={busy}
-                onClick={(e) => act(e, () => onVote(memory.id, fb.status === 'archived' ? 'unarchive' : 'archive'))}
-                className={cn(
-                  'flex size-7 items-center justify-center rounded-md border transition-colors',
-                  fb.status === 'archived'
-                    ? 'border-amber-500/50 bg-amber-500/10 text-amber-600 dark:text-amber-400'
-                    : 'border-border bg-background text-muted-foreground hover:text-amber-600 hover:border-amber-500/50'
-                )}
-              >
-                <ClockCounterClockwise className="size-4" />
-              </button>
+              <Tip tip="confirm">
+                <button
+                  type="button"
+                  aria-label="Marcar como correta"
+                  disabled={busy}
+                  onClick={(e) => act(e, () => onVote(memory.id, 'confirm'))}
+                  className={cn(
+                    'flex size-7 items-center justify-center rounded-md border transition-colors',
+                    fb.confidence >= 1
+                      ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                      : 'border-border bg-background text-muted-foreground hover:text-emerald-600 hover:border-emerald-500/50'
+                  )}
+                >
+                  <Check className="size-4" weight="bold" />
+                </button>
+              </Tip>
+              <Tip tip={fb.status === 'archived' ? 'unarchive' : 'archive'}>
+                <button
+                  type="button"
+                  aria-label={fb.status === 'archived' ? 'Desarquivar' : 'Arquivar: não é mais assim'}
+                  disabled={busy}
+                  onClick={(e) => act(e, () => onVote(memory.id, fb.status === 'archived' ? 'unarchive' : 'archive'))}
+                  className={cn(
+                    'flex size-7 items-center justify-center rounded-md border transition-colors',
+                    fb.status === 'archived'
+                      ? 'border-amber-500/50 bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                      : 'border-border bg-background text-muted-foreground hover:text-amber-600 hover:border-amber-500/50'
+                  )}
+                >
+                  <ClockCounterClockwise className="size-4" />
+                </button>
+              </Tip>
             </>
           )}
           {onForget && (
@@ -127,16 +130,17 @@ export function MemoryCard({ memory, onClick, onVote, onForget, busy }: MemoryCa
                 </button>
               </span>
             ) : (
-              <button
-                type="button"
-                title="Esquecer — apaga e evita que volte"
-                aria-label="Esquecer memória"
-                disabled={busy}
-                onClick={(e) => act(e, () => setConfirmingForget(true))}
-                className="flex size-7 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition-colors hover:text-destructive hover:border-destructive/50"
-              >
-                <X className="size-4" weight="bold" />
-              </button>
+              <Tip tip="forget">
+                <button
+                  type="button"
+                  aria-label="Esquecer memória"
+                  disabled={busy}
+                  onClick={(e) => act(e, () => setConfirmingForget(true))}
+                  className="flex size-7 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition-colors hover:text-destructive hover:border-destructive/50"
+                >
+                  <X className="size-4" weight="bold" />
+                </button>
+              </Tip>
             )
           )}
         </div>
