@@ -35,10 +35,9 @@ export function MemoryCard({ memory, onClick, onVote, onForget, busy }: MemoryCa
       onClick={() => onClick(memory.id)}
     >
       <div className="mb-1 truncate text-[16px] font-semibold leading-[1.7] tracking-[0.01em] text-card-foreground pr-20">
-        {memory.preview.slice(0, 70)}{memory.preview.length > 70 ? '...' : ''}
+        {formatDateTime(memory.created)}
       </div>
       <div className="flex gap-3 text-xs text-muted-foreground mb-1 items-center">
-        <span>{formatDateTime(memory.created)}</span>
         <span>{memory.project}</span>
         {fb.status === 'archived' && (
           <Badge variant="outline" className="text-[10px] px-1.5 py-0">
