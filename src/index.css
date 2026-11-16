@@ -1,6 +1,12 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Tooltips: preenche a caixa (pretty) em vez de balancear linhas curtas.
+   Unlayered author CSS vence o `text-balance` do componente base. */
+[data-slot="tooltip-content"] {
+  text-wrap: pretty;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 :root {
