@@ -19,8 +19,9 @@ Dev (HMR): `bun run server` num terminal + `bun run dev` noutro (`/api/*` proxia
 ## Como funciona
 
 Cada mensagem: `recall` + `graph/query` no lain-memory → injeta memórias no
-system prompt → stream do LLM → `remember` em background (`mode: bundle`,
-com dedup ADD/UPDATE/NOOP). Sem lain-memory no ar o chat funciona, mas sem
+system prompt → stream do LLM → `remember` em background (`mode: chat`:
+extrai fatos do que o usuário disse; a resposta do modelo não vira memória).
+Sem lain-memory no ar o chat funciona, mas sem
 memória. Vault (`/memorias`) lista `lain-memory` via `/api/vault/*`.
 
 ## Manter no ar (Mac local)

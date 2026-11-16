@@ -7,10 +7,9 @@ import {
 } from '@/components/ui/message'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { Button } from '@/components/ui/button'
-import { Spinner } from '@/components/ui/spinner'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Streamdown } from 'streamdown'
-import { ArrowDown, Check, Copy, RotateCcw } from 'lucide-react'
+import { ArrowDown, Check, Copy, ArrowCounterClockwise } from '@phosphor-icons/react'
 
 interface ChatMessagesProps {
   messages: ChatMessage[]
@@ -27,7 +26,7 @@ function CopyAction({ text }: { text: string }) {
         <Button
           variant="ghost"
           size="icon-xs"
-          aria-label="Copy"
+          aria-label="Copiar"
           onClick={async () => {
             try {
               await navigator.clipboard.writeText(text)
@@ -39,8 +38,26 @@ function CopyAction({ text }: { text: string }) {
           {copied ? <Check /> : <Copy />}
         </Button>
       </TooltipTrigger>
-      <TooltipContent>{copied ? 'Copied' : 'Copy'}</TooltipContent>
+      <TooltipContent>{copied ? 'Copiado' : 'Copiar'}</TooltipContent>
     </Tooltip>
+  )
+}
+
+function TypingDots() {
+  return (
+    <div
+      className="flex items-center gap-1.5 px-1 py-2"
+      role="status"
+      aria-label="Assistant is typing"
+    >
+      {[0, 1, 2].map((i) => (
+        <span
+          key={i}
+          className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/60"
+          style={{ animationDelay: `${i * 150}ms`, animationDuration: '1s' }}
+        />
+      ))}
+    </div>
   )
 }
 
@@ -98,10 +115,10 @@ export function ChatMessages({ messages, processing, onRetry }: ChatMessagesProp
           })
         }}
       >
-        <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-4">
+        <div className="chat-body mx-auto flex w-full max-w-[46rem] flex-col gap-8 px-6 py-6">
           {messages.length === 0 && !processing && (
             <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">
-              Start a conversation
+              Comece uma conversa
             </div>
           )}
           {messages.map((msg, i) => {
@@ -115,7 +132,7 @@ export function ChatMessages({ messages, processing, onRetry }: ChatMessagesProp
                         align="end"
                         className="*:data-[slot=bubble-content]:bg-foreground/85 *:data-[slot=bubble-content]:text-background"
                       >
-                        <BubbleContent className="whitespace-pre-wrap">
+                        <BubbleContent className="whitespace-pre-wrap text-[16px] font-[360] leading-[1.8] tracking-[0.015em]">
                           {msg.content}
                         </BubbleContent>
                       </Bubble>
@@ -131,7 +148,7 @@ export function ChatMessages({ messages, processing, onRetry }: ChatMessagesProp
                   <Message align="start">
                     <MessageContent>
                       <Bubble variant="destructive">
-                        <BubbleContent className="whitespace-pre-wrap">
+                        <BubbleContent className="whitespace-pre-wrap text-[16px] font-[360] leading-[1.8] tracking-[0.015em]">
                           {msg.content}
                         </BubbleContent>
                       </Bubble>
@@ -146,7 +163,7 @@ export function ChatMessages({ messages, processing, onRetry }: ChatMessagesProp
                               aria-label="Tentar de novo"
                               onClick={onRetry}
                             >
-                              <RotateCcw />
+                              <ArrowCounterClockwise />
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>Tentar de novo</TooltipContent>
@@ -163,7 +180,7 @@ export function ChatMessages({ messages, processing, onRetry }: ChatMessagesProp
                 <Message align="start">
                   <MessageContent>
                     <Bubble variant="ghost">
-                      <BubbleContent className="max-w-full">
+                      <BubbleContent className="max-w-full text-[16px] font-[360] leading-[1.8] tracking-[0.015em]">
                         <Streamdown>{msg.content}</Streamdown>
                       </BubbleContent>
                     </Bubble>
@@ -178,7 +195,7 @@ export function ChatMessages({ messages, processing, onRetry }: ChatMessagesProp
           {lastUserUnanswered && onRetry && (
             <div className="flex justify-start">
               <Button variant="outline" size="sm" onClick={onRetry}>
-                <RotateCcw />
+                <ArrowCounterClockwise />
                 Tentar de novo
               </Button>
             </div>
@@ -187,10 +204,7 @@ export function ChatMessages({ messages, processing, onRetry }: ChatMessagesProp
             <div>
               <Message align="start">
                 <MessageContent>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Spinner />
-                    <span>Thinking…</span>
-                  </div>
+                  <TypingDots />
                 </MessageContent>
               </Message>
             </div>
@@ -202,7 +216,7 @@ export function ChatMessages({ messages, processing, onRetry }: ChatMessagesProp
         <Button
           variant="secondary"
           size="icon-sm"
-          aria-label="Scroll to end"
+          aria-label="Ir para o final"
           onClick={() => {
             stickRef.current = true
             setShowJump(false)

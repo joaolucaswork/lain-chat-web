@@ -4,7 +4,6 @@ import type { Memory } from '@/types'
 import { MemoryCard } from '@/components/MemoryCard'
 import { MemoryDetail } from '@/components/MemoryDetail'
 import { GraphDetail } from '@/components/GraphDetail'
-import { ThemeToggle } from '@/components/ThemeToggle'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -130,9 +129,6 @@ export function MemoriesPage() {
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 items-center gap-3 border-b border-border bg-card px-4 py-2">
         <SidebarTrigger />
-        <div className="ml-auto flex shrink-0 items-center">
-          <ThemeToggle />
-        </div>
       </div>
       <div className="flex min-h-0 flex-1">
       <div className="w-56 border-r border-border bg-card p-3 space-y-4 overflow-y-auto shrink-0">
@@ -212,7 +208,7 @@ export function MemoriesPage() {
           <span>{memories.length} memorias</span>
         </div>
         <ScrollArea className="flex-1 min-h-0">
-          <div className="p-3">
+          <div className="mx-auto w-full max-w-2xl p-6">
             {loading ? (
               <div className="text-center text-muted-foreground py-8">carregando...</div>
             ) : (
@@ -234,7 +230,7 @@ export function MemoriesPage() {
                           <div className="h-px flex-1 bg-border/60" />
                         </div>
                       </div>
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         {day.items.map((m) => (
                           <MemoryCard
                             key={m.id}

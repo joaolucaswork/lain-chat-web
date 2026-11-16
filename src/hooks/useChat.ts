@@ -20,7 +20,6 @@ function getSessionId(): string {
 export function useChat(model: string) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [processing, setProcessing] = useState(false)
-  const [status, setStatus] = useState('Ready')
   const [sessionId, setSessionId] = useState(getSessionId)
   const eventSourceRef = useRef<EventSource | null>(null)
   const latestRequestedSessionRef = useRef<string | null>(getSessionId())
@@ -47,7 +46,6 @@ export function useChat(model: string) {
 
     es.addEventListener('processing_start', () => {
       setProcessing(true)
-      setStatus('Thinking...')
     })
 
     es.addEventListener('token', (e: MessageEvent) => {
@@ -75,14 +73,12 @@ export function useChat(model: string) {
 
     es.addEventListener('done', () => {
       setProcessing(false)
-      setStatus('Ready')
     })
 
     es.addEventListener('server_error', (e: MessageEvent) => {
       const data = JSON.parse(e.data)
       setMessages((prev) => [...prev, { role: 'system', content: `Error: ${data.message}` }])
       setProcessing(false)
-      setStatus('Ready')
     })
 
     es.addEventListener('ping', () => {})
@@ -111,7 +107,6 @@ export function useChat(model: string) {
       await fetch(`/api/chat/stop?sessionId=${sessionId}`, { method: 'POST' })
     } catch {}
     setProcessing(false)
-    setStatus('Ready')
   }, [sessionId])
 
   const retryLast = useCallback(async () => {
@@ -192,7 +187,6 @@ export function useChat(model: string) {
     sessionStorage.setItem(SESSION_ID_KEY, sid)
     setMessages([])
     setProcessing(false)
-    setStatus('Ready')
     void loadMessages(sid)
     connectSSE(sid)
   }, [loadMessages, connectSSE])
@@ -216,7 +210,6 @@ export function useChat(model: string) {
   return {
     messages,
     processing,
-    status,
     sessionId,
     sendMessage,
     retryLast,

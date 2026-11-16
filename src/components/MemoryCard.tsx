@@ -1,17 +1,10 @@
 import type { Memory } from '@/types'
 import { Badge } from '@/components/ui/badge'
+import { formatDateTime } from '@/lib/utils'
 
 interface MemoryCardProps {
   memory: Memory
   onClick: (id: string) => void
-}
-
-const timeFmt = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' })
-
-function formatTime(iso: string) {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return iso || ''
-  return timeFmt.format(d)
 }
 
 export function MemoryCard({ memory, onClick }: MemoryCardProps) {
@@ -22,14 +15,14 @@ export function MemoryCard({ memory, onClick }: MemoryCardProps) {
       className="bg-card border border-border rounded-lg p-4 cursor-pointer hover:border-primary/50 transition-colors"
       onClick={() => onClick(memory.id)}
     >
-      <div className="text-sm font-semibold mb-1 text-card-foreground truncate">
+      <div className="mb-1 truncate text-[16px] font-semibold leading-[1.7] tracking-[0.01em] text-card-foreground">
         {memory.preview.slice(0, 70)}{memory.preview.length > 70 ? '...' : ''}
       </div>
       <div className="flex gap-3 text-xs text-muted-foreground mb-1">
-        <span>{formatTime(memory.created)}</span>
+        <span>{formatDateTime(memory.created)}</span>
         <span>{memory.project}</span>
       </div>
-      <div className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
+      <div className="line-clamp-2 text-[16px] leading-[1.8] tracking-[0.015em] text-muted-foreground">
         {memory.preview}
       </div>
       {tags.length > 0 && (

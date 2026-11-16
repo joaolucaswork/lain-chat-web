@@ -116,8 +116,31 @@
   * {
     @apply border-border;
   }
+  button:not(:disabled) {
+    cursor: pointer;
+  }
   body {
     @apply bg-background text-foreground;
     font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', 'Segoe UI', system-ui, sans-serif;
+  }
+
+  /* Tipografia do chat: 16px, respiro maior entre linhas/letras */
+  .chat-body {
+    font-size: 16px;
+    line-height: 1.8;
+    letter-spacing: 0.015em;
+    font-weight: 360;
+  }
+  .chat-body p {
+    margin-block: 0.75em;
+  }
+  .chat-body p:first-child {
+    margin-top: 0;
+  }
+  .chat-body p:last-child {
+    margin-bottom: 0;
+  }
+  .chat-body li {
+    margin-block: 0.35em;
   }
 }

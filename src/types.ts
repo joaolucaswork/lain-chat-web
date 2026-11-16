@@ -25,5 +25,6 @@ export interface Session {
   createdAt: number
   messageCount: number
   preview: string
+  title?: string
   model?: string
 }

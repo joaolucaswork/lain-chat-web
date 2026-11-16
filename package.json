@@ -11,16 +11,18 @@
     "server": "bun run server/server.ts"
   },
   "dependencies": {
+    "@phosphor-icons/react": "^2.1.10",
     "@shadcn/react": "^0.3.1",
     "@tailwindcss/vite": "^4.3.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "lucide-react": "^1.22.0",
+    "motion": "^14.14.0",
     "radix-ui": "^1.6.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.18.1",
     "streamdown": "^2.7.0",
+    "swiper": "^14.4.0",
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4.3.2"
   },
