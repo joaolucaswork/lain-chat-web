@@ -403,12 +403,12 @@ function buildMemoryBlock(hits: MemoryHit[], graphMd?: string): string {
       const tag = proj ? (d ? `[${proj} ${d}]` : `[${proj}]`) : (d ? `[${d}]` : '');
       return `- ${tag ? `${tag} ` : ''}${h.memory}`;
     }).join('\n').slice(0, 4000);
-    parts.push(`[MEMORIAS RELEVANTES — hoje é ${today.long} (${today.iso}, America/Sao_Paulo), agora são ${today.time}; [projeto data] = escopo de origem + quando a memória foi salva]\n` + body);
+    parts.push(`[MEMORIAS RELEVANTES — hoje é ${today.long} (${today.iso}, America/Sao_Paulo), agora são ${today.time}; [projeto data] = escopo de origem + quando a memória foi salva. Regra temporal: "hoje/ontem/agora" da conversa = hoje; relativos dentro de cada memória ("ontem", "semana passada") = data da tag, nunca hoje.]\n` + body);
   }
   const g = (graphMd ?? '').trim();
   if (g) {
     // Sem recall mas com grafo: a data ainda precisa ir (senão o LLM fica sem "hoje").
-    if (hits.length === 0) parts.push(`Data de hoje: ${today.long} (${today.iso}, America/Sao_Paulo), hora: ${today.time}.`);
+    if (hits.length === 0) parts.push(`Data de hoje: ${today.long} (${today.iso}, America/Sao_Paulo), hora: ${today.time}. Relativos da conversa ("hoje/ontem/agora") = hoje.`);
     parts.push('[GRAFO]\n' + g.slice(0, 1500));
   }
   return parts.join('\n\n');
@@ -962,7 +962,7 @@ async function processMessage(session: Session, userMessage: string, signal?: Ab
     session.messages[0] as unknown as Record<string, unknown>,
     ...(memBlock
       ? [{ role: 'system', content: `Contexto da memória de longo prazo (use quando relevante):\n${memBlock}` }]
-      : [{ role: 'system', content: `Data de hoje: ${today.long} (${today.iso}, America/Sao_Paulo), hora: ${today.time}. Use para resolver "hoje/ontem", o dia da semana e "agora/há pouco" na conversa.` }]),
+      : [{ role: 'system', content: `Data de hoje: ${today.long} (${today.iso}, America/Sao_Paulo), hora: ${today.time}. Use para resolver "hoje/ontem", o dia da semana e "agora/há pouco" na conversa; relativos em memórias futuras resolvem pela data da tag.` }]),
     ...(history as unknown as Array<Record<string, unknown>>),
   ];
 
