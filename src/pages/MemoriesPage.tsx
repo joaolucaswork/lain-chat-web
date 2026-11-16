@@ -1,11 +1,13 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
+import { useOutletContext } from 'react-router-dom'
 import { useMemories } from '@/hooks/useMemories'
 import type { Memory, FeedbackAction } from '@/types'
 import { MemoryCard } from '@/components/MemoryCard'
 import { MemoryDetail } from '@/components/MemoryDetail'
 import { GraphDetail } from '@/components/GraphDetail'
 import { UndoBar } from '@/components/UndoBar'
-import { SidebarTrigger } from '@/components/ui/sidebar'
+import { List } from '@phosphor-icons/react'
+import type { LayoutContext } from './Layout'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
@@ -31,6 +33,7 @@ interface MonthGroup {
 }
 
 export function MemoriesPage() {
+  const { openMobileNav } = useOutletContext<LayoutContext>()
   const { memories, graphNodes, loading, error, load, getMemory, getGraphNode, vote, forget, restore } = useMemories()
   const [search, setSearch] = useState('')
   const [activeProject, setActiveProject] = useState('')
@@ -184,7 +187,15 @@ export function MemoriesPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col relative">
       <div className="flex shrink-0 items-center gap-3 border-b border-border bg-card px-4 py-2">
-        <SidebarTrigger />
+        <button
+          type="button"
+          aria-label="Abrir menu"
+          onClick={openMobileNav}
+          className="flex size-8 items-center justify-center rounded-md hover:bg-accent md:hidden"
+        >
+          <List className="size-5" />
+        </button>
+        <h2 className="text-sm font-semibold md:hidden">Memórias</h2>
       </div>
       <div className="flex min-h-0 flex-1">
       <div className="w-56 border-r border-border bg-card p-3 space-y-4 overflow-y-auto shrink-0">

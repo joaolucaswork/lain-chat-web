@@ -885,7 +885,7 @@ async function processMessage(session: Session, userMessage: string, signal?: Ab
 
 // ─── Vault mapping (lain-memory → formato da UI) ───
 
-interface VaultMemory { id: string; file: string; project: string; tags: string[]; created: string; preview: string; confidence: number; last_confirmed_at: string | null; status: 'active' | 'archived'; kind: 'fact' | 'state' }
+interface VaultMemory { id: string; file: string; project: string; tags: string[]; created: string; preview: string; title: string | null; confidence: number; last_confirmed_at: string | null; status: 'active' | 'archived'; kind: 'fact' | 'state' }
 
 async function discoverMemoryProjects(): Promise<string[]> {
   try {
@@ -918,6 +918,7 @@ async function listVaultMemories(): Promise<VaultMemory[]> {
         id: m.id, file: '', project: projectLabel, tags: [],
         created: m.created_at ?? '',
         preview: body.slice(0, 200) + (body.length > 200 ? '...' : ''),
+        title: typeof m.title === 'string' && m.title ? m.title : null,
         confidence: typeof m.confidence === 'number' ? m.confidence : 0.5,
         last_confirmed_at: typeof m.last_confirmed_at === 'string' ? m.last_confirmed_at : null,
         status: m.status === 'archived' ? 'archived' : 'active',

@@ -74,11 +74,11 @@ export function MemoryDetail({ memoryId, onClose, getMemory, onVote, onForget, b
           <>
             <DialogHeader>
               <DialogTitle className="text-base font-semibold">
-                {data.created ? formatDateTime(data.created) : ''}
+                {data.title || (data.created ? formatDateTime(data.created) : '')}
               </DialogTitle>
             </DialogHeader>
             <div className="text-xs text-muted-foreground mb-3">
-              {data.project || ''}
+              {data.created ? formatDateTime(data.created) : ''}{data.project ? ` · ${data.project}` : ''}
             </div>
             {(data.tags || []).length > 0 && (
               <div className="flex flex-wrap gap-1 mb-4">

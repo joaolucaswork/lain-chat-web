@@ -3,20 +3,27 @@ import { useOutletContext } from 'react-router-dom'
 import { ChatMessages } from '@/components/ChatMessages'
 import { ChatInput } from '@/components/ChatInput'
 import { RecentMemories } from '@/components/RecentMemories'
-import { SidebarTrigger } from '@/components/ui/sidebar'
+import { List } from '@phosphor-icons/react'
 import type { LayoutContext } from './Layout'
 
 const spring = { type: 'spring' as const, stiffness: 260, damping: 32 }
 
 export function ChatPage() {
   const ctx = useOutletContext<LayoutContext>()
-  const { messages, processing, sendMessage, retryLast, stopGenerating, sessionTitle } = ctx
+  const { messages, processing, sendMessage, retryLast, stopGenerating, sessionTitle, openMobileNav } = ctx
   const isEmpty = messages.length === 0 && !processing
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 items-center gap-3 bg-transparent px-4 pt-3 pb-5">
-        <SidebarTrigger />
+        <button
+          type="button"
+          aria-label="Abrir menu"
+          onClick={openMobileNav}
+          className="flex size-8 items-center justify-center rounded-md hover:bg-accent md:hidden"
+        >
+          <List className="size-5" />
+        </button>
         <h1 className="flex-1 truncate text-left text-[15px] font-medium text-muted-foreground">
           {sessionTitle || 'Nova conversa'}
         </h1>

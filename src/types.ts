@@ -9,6 +9,8 @@ export interface Memory {
   tags: string[]
   created: string
   preview: string
+  /** Título curto (ideal 3, máx 6 palavras). Null até o backfill/extração gerar. */
+  title?: string | null
   confidence: number
   last_confirmed_at: string | null
   status: MemoryStatus

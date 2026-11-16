@@ -1,5 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { SidebarTrigger } from '@/components/ui/sidebar'
+import { useOutletContext } from 'react-router-dom'
+import { List } from '@phosphor-icons/react'
+import type { LayoutContext } from './Layout'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import {
@@ -36,6 +38,7 @@ interface SettingsStatus {
 }
 
 export function SettingsPage() {
+  const { openMobileNav } = useOutletContext<LayoutContext>()
   const [status, setStatus] = useState<SettingsStatus | null>(null)
   const [key, setKey] = useState('')
   const [show, setShow] = useState(false)
@@ -110,7 +113,14 @@ export function SettingsPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 items-center gap-3 border-b border-border bg-card px-4 py-2">
-        <SidebarTrigger />
+        <button
+          type="button"
+          aria-label="Abrir menu"
+          onClick={openMobileNav}
+          className="flex size-8 items-center justify-center rounded-md hover:bg-accent md:hidden"
+        >
+          <List className="size-5" />
+        </button>
         <h2 className="text-sm font-semibold">Configurações</h2>
       </div>
 

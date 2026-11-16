@@ -287,10 +287,10 @@ export function RecentMemories() {
                 className={`flex h-[148px] cursor-pointer flex-col rounded-xl bg-card p-3.5 text-left select-none transition-all duration-300 hover:bg-accent/60 ${dragging && isSide ? 'shadow-[0_12px_32px_rgba(0,0,0,0.14)]' : 'shadow-none'}`}
               >
                 <div className="mb-1 truncate text-[13px] font-semibold leading-snug text-card-foreground">
-                  {formatDateTime(m.created)}
+                  {m.title || formatDateTime(m.created)}
                 </div>
                 <div className="mb-1.5 text-[11px] text-muted-foreground">
-                  {m.project}
+                  {formatDateTime(m.created)} · {m.project}
                 </div>
                 <div className="relative min-h-0 flex-1 overflow-hidden">
                   <div className="line-clamp-3 text-[13px] leading-[1.6] text-muted-foreground">
