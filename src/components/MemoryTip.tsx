@@ -1,7 +1,5 @@
-import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
-import { Info } from '@phosphor-icons/react'
 
 export const FEEDBACK_TIPS = {
   confirm: {
@@ -30,32 +28,13 @@ interface TipProps {
   children: ReactNode
 }
 
-/**
- * Tooltip explicativo com entrada animada (fade + zoom + slide).
- * Hover abre no desktop; o botão ⓘ abre no toque (click alterna).
- */
+/** Tooltip explicativo com entrada animada (fade + zoom + slide). */
 export function Tip({ tip, side = 'bottom', children }: TipProps) {
-  const [open, setOpen] = useState(false)
   const copy = FEEDBACK_TIPS[tip]
   return (
-    <Tooltip open={open} onOpenChange={setOpen}>
-      <TooltipTrigger asChild>
-        <span className="relative inline-flex">
-          {children}
-          <button
-            type="button"
-            aria-label={`O que faz: ${copy.title}`}
-            onClick={(e) => {
-              e.stopPropagation()
-              setOpen((v) => !v)
-            }}
-            className="absolute -top-1.5 -right-1.5 z-10 flex size-3.5 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
-          >
-            <Info className="size-2.5" weight="bold" />
-          </button>
-        </span>
-      </TooltipTrigger>
-      <TooltipContent side={side} className="max-w-[240px] duration-150">
+    <Tooltip>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent side={side} className="max-w-[320px] duration-150">
         <p className="font-semibold">{copy.title}</p>
         <p className="opacity-80">{copy.body}</p>
       </TooltipContent>
