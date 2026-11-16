@@ -284,7 +284,7 @@ export function RecentMemories() {
                   if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 8) return
                   setSelectedId(m.id)
                 }}
-                className={`flex h-[148px] cursor-pointer flex-col rounded-xl bg-card p-3.5 text-left select-none transition-all duration-300 hover:bg-accent/60 ${dragging && isSide ? 'shadow-[0_12px_32px_rgba(0,0,0,0.14)]' : 'shadow-none'}`}
+                className={`flex h-[148px] cursor-pointer flex-col rounded-xl bg-card p-3.5 text-left select-none transition-all duration-300 hover:bg-accent/60 dark:bg-[#1D1E20] ${dragging && isSide ? 'shadow-[0_12px_32px_rgba(0,0,0,0.14)] dark:shadow-[0_12px_32px_#131416]' : 'shadow-none'}`}
               >
                 <div className="mb-1 truncate text-[13px] font-semibold leading-snug text-card-foreground">
                   {m.title || formatDateTime(m.created)}
@@ -296,7 +296,7 @@ export function RecentMemories() {
                   <div className="line-clamp-3 text-[13px] leading-[1.6] text-muted-foreground">
                     {m.preview}
                   </div>
-                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-card to-transparent" />
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-card to-transparent dark:from-[#1D1E20]" />
                 </div>
                 {(m.tags || []).length > 0 && (
                   <div className="mt-2 flex gap-1 overflow-hidden">
@@ -313,10 +313,10 @@ export function RecentMemories() {
           })}
         </Swiper>
         <div
-          className={`pointer-events-none absolute inset-y-0 left-0 z-10 w-8 bg-gradient-to-r from-background to-transparent transition-opacity duration-300 ${dragging && showLeft ? 'opacity-100' : 'opacity-0'}`}
+          className={`pointer-events-none absolute inset-y-0 left-0 z-10 w-8 bg-gradient-to-r from-background to-transparent transition-opacity duration-300 dark:from-[#131416] ${dragging && showLeft ? 'opacity-100' : 'opacity-0'}`}
         />
         <div
-          className={`pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-background to-transparent transition-opacity duration-300 ${dragging && showRight ? 'opacity-100' : 'opacity-0'}`}
+          className={`pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-background to-transparent transition-opacity duration-300 dark:from-[#131416] ${dragging && showRight ? 'opacity-100' : 'opacity-0'}`}
         />
       </div>
 

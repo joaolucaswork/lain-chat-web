@@ -54,4 +54,6 @@ export interface Session {
   preview: string
   title?: string
   model?: string
+  favorite?: boolean
+  favoritedAt?: number
 }

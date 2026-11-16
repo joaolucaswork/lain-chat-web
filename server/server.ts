@@ -132,6 +132,8 @@ interface Session {
   createdAt: number;
   model: string;
   title?: string;
+  favorite?: boolean;
+  favoritedAt?: number;
 }
 
 const sessions = new Map<string, Session>();
@@ -196,6 +198,8 @@ function loadSessionsFromDisk(): void {
         createdAt: typeof s.createdAt === 'number' ? s.createdAt : Date.now(),
         model: typeof s.model === 'string' && s.model ? s.model : DEFAULT_MODEL,
         title: typeof (s as Partial<Session>).title === 'string' ? ((s as Partial<Session>).title as string).slice(0, 80) || undefined : undefined,
+        favorite: (s as Partial<Session>).favorite === true ? true : undefined,
+        favoritedAt: typeof (s as Partial<Session>).favoritedAt === 'number' ? (s as Partial<Session>).favoritedAt as number : undefined,
       });
       loaded++;
     } catch {
@@ -1156,6 +1160,8 @@ Bun.serve({
         messageCount: s.messages.filter(m => m.role !== 'system').length,
         preview: s.messages.find(m => m.role === 'user')?.content?.slice(0, 100) || '',
         title: s.title || '',
+        favorite: s.favorite === true,
+        favoritedAt: typeof s.favoritedAt === 'number' ? s.favoritedAt : undefined,
       })).sort((a, b) => b.createdAt - a.createdAt);
       return json({ sessions: list });
     }
@@ -1176,6 +1182,39 @@ Bun.serve({
         return json({ error: 'session not found' }, 404);
       }
       return json({ ok: true });
+    }
+
+    // ── Patch session ──
+    // PATCH /api/sessions/:id  body: { title?: string, favorite?: boolean }
+    if (req.method === 'PATCH' && path.startsWith('/api/sessions/')) {
+      const sessionId = decodeURIComponent(path.slice('/api/sessions/'.length));
+      if (!isSafeSessionId(sessionId)) return json({ error: 'invalid sessionId' }, 400);
+      const s = sessions.get(sessionId);
+      if (!s) return json({ error: 'session not found' }, 404);
+      let body: any = {};
+      try { body = await req.json(); } catch { return json({ error: 'Invalid JSON' }, 400); }
+      if (typeof body.title === 'string') {
+        const t = body.title.trim().slice(0, 80);
+        if (t) s.title = t;
+        else delete s.title;
+      }
+      if (typeof body.favorite === 'boolean') {
+        if (body.favorite) {
+          s.favorite = true;
+          s.favoritedAt = Date.now();
+        } else {
+          delete s.favorite;
+          delete s.favoritedAt;
+        }
+      }
+      persistSession(s);
+      return json({
+        ok: true,
+        session: {
+          id: s.id, title: s.title || '',
+          favorite: s.favorite === true, favoritedAt: s.favoritedAt,
+        },
+      });
     }
 
     // ── Vault: memórias (via lain-memory) ──

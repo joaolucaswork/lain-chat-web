@@ -38,7 +38,7 @@ export function ChatInput({ onSend, onStop, disabled, placeholder = 'Envie uma m
   }
 
   return (
-    <div className={bare ? 'w-full' : 'shrink-0 border-t border-border bg-background p-4'}>
+    <div className={bare ? 'w-full' : 'shrink-0 border-t border-border bg-background p-4 dark:bg-[#131416]'}>
       <div className={bare ? 'w-full' : 'mx-auto w-full max-w-[46rem]'}>
         <InputGroup className="rounded-3xl border border-border bg-muted px-1 py-1 shadow-none dark:border-0 dark:bg-input/30 has-[[data-slot=input-group-control]:focus-visible]:border-border has-[[data-slot=input-group-control]:focus-visible]:ring-0 dark:has-[[data-slot=input-group-control]:focus-visible]:border-0">
           <InputGroupTextarea
