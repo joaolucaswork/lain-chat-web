@@ -373,23 +373,39 @@ function memDate(m: { updated_at?: string | null; created_at?: string | null }):
   return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : '';
 }
 
+/** Data de hoje no fuso do usuário (America/Sao_Paulo), não UTC.
+ *  `toISOString()` quebra perto da virada (21h BRT = 00h UTC do dia seguinte)
+ *  e o LLM ainda tinha que adivinhar o dia da semana a partir de YYYY-MM-DD. */
+function getSaoPauloToday(now: Date = new Date()): { iso: string; long: string } {
+  const iso = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(now);
+  const weekday = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long' }).format(now);
+  const dmy = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric',
+  }).format(now);
+  return { iso, long: `${weekday}, ${dmy}` };
+}
+
 function buildMemoryBlock(hits: MemoryHit[], graphMd?: string): string {
   const parts: string[] = [];
+  const today = getSaoPauloToday();
   if (hits.length > 0) {
     // Teto de ~4000 chars: com fan-out o bloco cresceria sem controle no prompt.
     // Tag [projeto] = escopo de origem (global/diario/lain-memory/...); data = quando foi salvo.
     // O "quando aconteceu" continua vindo do texto da memória (ex "Na época...", "Antes...").
-    const today = new Date().toISOString().slice(0, 10);
     const body = hits.map(h => {
       const d = memDate(h);
       const proj = (h.project ?? '').trim();
       const tag = proj ? (d ? `[${proj} ${d}]` : `[${proj}]`) : (d ? `[${d}]` : '');
       return `- ${tag ? `${tag} ` : ''}${h.memory}`;
     }).join('\n').slice(0, 4000);
-    parts.push(`[MEMORIAS RELEVANTES — hoje é ${today}; [projeto data] = escopo de origem + quando a memória foi salva]\n` + body);
+    parts.push(`[MEMORIAS RELEVANTES — hoje é ${today.long} (${today.iso}, America/Sao_Paulo); [projeto data] = escopo de origem + quando a memória foi salva]\n` + body);
   }
   const g = (graphMd ?? '').trim();
   if (g) {
+    // Sem recall mas com grafo: a data ainda precisa ir (senão o LLM fica sem "hoje").
+    if (hits.length === 0) parts.push(`Data de hoje: ${today.long} (${today.iso}, America/Sao_Paulo).`);
     parts.push('[GRAFO]\n' + g.slice(0, 1500));
   }
   return parts.join('\n\n');
@@ -450,7 +466,7 @@ function rememberTurn(userMsg: string, assistantText: string): void {
       assistant: assistantText.trim().slice(0, 12000),
       project: CHAT_PROJECT || undefined,
       mode: 'chat',
-      date: new Date().toISOString().slice(0, 10),
+      date: getSaoPauloToday().iso,
     }, 60_000)
     .then((r: any) => {
       const ids = Array.isArray(r) ? r.map(x => `${x.id}${x.action ? `:${x.action}` : ''}`) : [];
@@ -938,12 +954,12 @@ async function processMessage(session: Session, userMessage: string, signal?: Ab
   // 2. Monta contexto: system + memórias + histórico recente (sem acumular no session)
   // Data de hoje vai sempre — mesmo com recall vazio — para o LLM resolver "hoje/ontem".
   const history = session.messages.filter(m => m.role !== 'system').slice(-20);
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const today = getSaoPauloToday();
   const apiMessages: Array<Record<string, unknown>> = [
     session.messages[0] as unknown as Record<string, unknown>,
     ...(memBlock
       ? [{ role: 'system', content: `Contexto da memória de longo prazo (use quando relevante):\n${memBlock}` }]
-      : [{ role: 'system', content: `Data de hoje: ${todayStr}. Use para resolver "hoje/ontem" na conversa.` }]),
+      : [{ role: 'system', content: `Data de hoje: ${today.long} (${today.iso}, America/Sao_Paulo). Use para resolver "hoje/ontem" e o dia da semana na conversa.` }]),
     ...(history as unknown as Array<Record<string, unknown>>),
   ];
 
