@@ -10,6 +10,7 @@
  *
  * Env:
  *   CHAT_PORT            — porta deste servidor (default 3335)
+ *   BIND_ADDR              — endereço de bind (default 127.0.0.1; expor na LAN só com BIND_ADDR=0.0.0.0 explícito)
  *   LAIN_MEMORY_URL      — base do lain-memory (default http://localhost:3341)
  *   LAIN_LLM_BASE_URL    — endpoint OpenAI-compatible (default https://openrouter.ai/api/v1)
  *   LAIN_LLM_API_KEY     — chave (fallback OPENROUTER_API_KEY, AI_GATEWAY_API_KEY)
@@ -48,6 +49,9 @@ try {
   }
 } catch { /* sem .env = usa env do processo */ }
 const PORT = parseInt(process.env.CHAT_PORT || '3335', 10);
+// Default loopback: Bun sem `hostname` binda 0.0.0.0 e expõe o vault/chave na LAN.
+// Só exponha com BIND_ADDR=0.0.0.0 explícito (ideal atrás de SSH tunnel / Tailscale).
+const BIND_ADDR = process.env.BIND_ADDR || '127.0.0.1';
 const MEMORY_URL = (process.env.LAIN_MEMORY_URL || 'http://localhost:3341').replace(/\/$/, '');
 const MEMORY_KEY = process.env.LAIN_MEMORY_API_KEY || process.env.LAIN_API_KEY || '';
 const LLM_BASE = (process.env.LAIN_LLM_BASE_URL
@@ -970,6 +974,7 @@ for (const s of sessions.values()) {
 }
 
 Bun.serve({
+  hostname: BIND_ADDR,
   port: PORT,
   idleTimeout: 120, // SSE streams ficam abertos; keepalive a cada 10s
   async fetch(req) {
@@ -1355,4 +1360,4 @@ Bun.serve({
   },
 });
 
-console.log(`[lain-chat-bff] listening on :${PORT} (memory: ${MEMORY_URL}, llm: ${LLM_BASE})`);
+console.log(`[lain-chat-bff] listening on http://${BIND_ADDR}:${PORT} (memory: ${MEMORY_URL}, llm: ${LLM_BASE})`);
