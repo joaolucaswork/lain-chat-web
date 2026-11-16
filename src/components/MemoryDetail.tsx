@@ -13,6 +13,7 @@ import type { Memory, FeedbackAction } from '@/types'
 import { feedbackOf } from '@/types'
 import { Tip } from '@/components/MemoryTip'
 import { Check, ClockCounterClockwise, X } from '@phosphor-icons/react'
+import { renderWikiHtml } from '@/lib/linkify'
 
 interface MemoryDetailProps {
   memoryId: string | null
@@ -41,9 +42,6 @@ export function MemoryDetail({ memoryId, onClose, getMemory, onVote, onForget, b
       setLoading(false)
     })
   }, [memoryId, getMemory, refreshKey])
-
-  const linkify = (text: string) =>
-    text.replace(/\[\[([^\]]+)\]\]/g, '<a href="javascript:void(0)" class="text-primary hover:underline">$1</a>')
 
   return (
     <Dialog open={!!memoryId} onOpenChange={() => onClose()}>
@@ -92,7 +90,7 @@ export function MemoryDetail({ memoryId, onClose, getMemory, onVote, onForget, b
             <div
               className="text-[16px] leading-[1.8] tracking-[0.015em] whitespace-pre-wrap"
               dangerouslySetInnerHTML={{
-                __html: linkify((data.body || '').trim()),
+                __html: renderWikiHtml((data.body || '').trim()),
               }}
             />
             {(onVote || onForget) && (() => {

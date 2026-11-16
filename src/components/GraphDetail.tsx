@@ -6,6 +6,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import type { GraphNode } from '@/types'
+import { renderWikiHtml } from '@/lib/linkify'
 
 interface GraphDetailProps {
   nodeKey: string | null
@@ -29,9 +30,6 @@ export function GraphDetail({ nodeKey, onClose, getNode }: GraphDetailProps) {
     })
   }, [nodeKey, getNode])
 
-  const linkify = (text: string) =>
-    text.replace(/\[\[([^\]]+)\]\]/g, '<a href="javascript:void(0)" class="text-primary hover:underline">$1</a>')
-
   return (
     <Dialog open={!!nodeKey} onOpenChange={() => onClose()}>
       <DialogContent className="max-w-2xl max-h-[70vh] overflow-y-auto">
@@ -48,7 +46,7 @@ export function GraphDetail({ nodeKey, onClose, getNode }: GraphDetailProps) {
             <div
               className="text-sm leading-relaxed whitespace-pre-wrap"
               dangerouslySetInnerHTML={{
-                __html: linkify((data.body || '').trim()),
+                __html: renderWikiHtml((data.body || '').trim()),
               }}
             />
           </>
