@@ -373,10 +373,10 @@ function memDate(m: { updated_at?: string | null; created_at?: string | null }):
   return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : '';
 }
 
-/** Data de hoje no fuso do usuário (America/Sao_Paulo), não UTC.
+/** Data/hora de agora no fuso do usuário (America/Sao_Paulo), não UTC.
  *  `toISOString()` quebra perto da virada (21h BRT = 00h UTC do dia seguinte)
  *  e o LLM ainda tinha que adivinhar o dia da semana a partir de YYYY-MM-DD. */
-function getSaoPauloToday(now: Date = new Date()): { iso: string; long: string } {
+function getSaoPauloToday(now: Date = new Date()): { iso: string; long: string; time: string } {
   const iso = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit',
   }).format(now);
@@ -384,7 +384,10 @@ function getSaoPauloToday(now: Date = new Date()): { iso: string; long: string }
   const dmy = new Intl.DateTimeFormat('pt-BR', {
     timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric',
   }).format(now);
-  return { iso, long: `${weekday}, ${dmy}` };
+  const time = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(now);
+  return { iso, long: `${weekday}, ${dmy}`, time };
 }
 
 function buildMemoryBlock(hits: MemoryHit[], graphMd?: string): string {
@@ -400,12 +403,12 @@ function buildMemoryBlock(hits: MemoryHit[], graphMd?: string): string {
       const tag = proj ? (d ? `[${proj} ${d}]` : `[${proj}]`) : (d ? `[${d}]` : '');
       return `- ${tag ? `${tag} ` : ''}${h.memory}`;
     }).join('\n').slice(0, 4000);
-    parts.push(`[MEMORIAS RELEVANTES — hoje é ${today.long} (${today.iso}, America/Sao_Paulo); [projeto data] = escopo de origem + quando a memória foi salva]\n` + body);
+    parts.push(`[MEMORIAS RELEVANTES — hoje é ${today.long} (${today.iso}, America/Sao_Paulo), agora são ${today.time}; [projeto data] = escopo de origem + quando a memória foi salva]\n` + body);
   }
   const g = (graphMd ?? '').trim();
   if (g) {
     // Sem recall mas com grafo: a data ainda precisa ir (senão o LLM fica sem "hoje").
-    if (hits.length === 0) parts.push(`Data de hoje: ${today.long} (${today.iso}, America/Sao_Paulo).`);
+    if (hits.length === 0) parts.push(`Data de hoje: ${today.long} (${today.iso}, America/Sao_Paulo), hora: ${today.time}.`);
     parts.push('[GRAFO]\n' + g.slice(0, 1500));
   }
   return parts.join('\n\n');
@@ -959,7 +962,7 @@ async function processMessage(session: Session, userMessage: string, signal?: Ab
     session.messages[0] as unknown as Record<string, unknown>,
     ...(memBlock
       ? [{ role: 'system', content: `Contexto da memória de longo prazo (use quando relevante):\n${memBlock}` }]
-      : [{ role: 'system', content: `Data de hoje: ${today.long} (${today.iso}, America/Sao_Paulo). Use para resolver "hoje/ontem" e o dia da semana na conversa.` }]),
+      : [{ role: 'system', content: `Data de hoje: ${today.long} (${today.iso}, America/Sao_Paulo), hora: ${today.time}. Use para resolver "hoje/ontem", o dia da semana e "agora/há pouco" na conversa.` }]),
     ...(history as unknown as Array<Record<string, unknown>>),
   ];
 
