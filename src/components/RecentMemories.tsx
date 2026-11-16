@@ -6,16 +6,22 @@ import type { Swiper as SwiperType } from 'swiper'
 import { FreeMode } from 'swiper/modules'
 import 'swiper/css'
 import { CaretLeft, CaretRight } from '@phosphor-icons/react'
-import type { Memory } from '@/types'
+import type { Memory, FeedbackAction } from '@/types'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { MemoryDetail } from '@/components/MemoryDetail'
+import { UndoBar } from '@/components/UndoBar'
 import { formatDateTime } from '@/lib/utils'
+import { sendFeedback, forgetMemory, restoreMemory } from '@/lib/memoryApi'
 
 export function RecentMemories() {
   const [memories, setMemories] = useState<Memory[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [detailVersion, setDetailVersion] = useState(0)
+  const [undo, setUndo] = useState<{ message: string; run: () => void } | null>(null)
+  const undoTimer = useRef<number | null>(null)
   const [showLeft, setShowLeft] = useState(false)
   const [showRight, setShowRight] = useState(false)
   const [activeIdx, setActiveIdx] = useState(0)
@@ -31,30 +37,35 @@ export function RecentMemories() {
     setActiveIdx(s.activeIndex)
   }, [])
 
+  const reload = useCallback(async () => {
+    try {
+      const r = await fetch('/api/vault/memories')
+      const data: Memory[] = r.ok ? await r.json() : []
+      const sorted = [...(Array.isArray(data) ? data : [])].sort((a, b) => {
+        const ta = Date.parse(a.created || '')
+        const tb = Date.parse(b.created || '')
+        if (Number.isNaN(ta) && Number.isNaN(tb)) return 0
+        if (Number.isNaN(ta)) return 1
+        if (Number.isNaN(tb)) return -1
+        return tb - ta
+      })
+      setMemories(sorted.slice(0, 12))
+    } catch {
+      /* mantém lista atual */
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     let alive = true
-    fetch('/api/vault/memories')
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data: Memory[]) => {
-        if (!alive) return
-        const sorted = [...(Array.isArray(data) ? data : [])].sort((a, b) => {
-          const ta = Date.parse(a.created || '')
-          const tb = Date.parse(b.created || '')
-          if (Number.isNaN(ta) && Number.isNaN(tb)) return 0
-          if (Number.isNaN(ta)) return 1
-          if (Number.isNaN(tb)) return -1
-          return tb - ta
-        })
-        setMemories(sorted.slice(0, 12))
-        setLoading(false)
-      })
-      .catch(() => {
-        setLoading(false)
-      })
+    reload().then(() => {
+      if (!alive) return
+    })
     return () => {
       alive = false
     }
-  }, [])
+  }, [reload])
 
   const getMemory = useCallback(async (id: string) => {
     try {
@@ -65,6 +76,67 @@ export function RecentMemories() {
       return null
     }
   }, [])
+
+  const showUndo = useCallback((message: string, run: () => void) => {
+    if (undoTimer.current) window.clearTimeout(undoTimer.current)
+    setUndo({ message, run })
+    undoTimer.current = window.setTimeout(() => setUndo(null), 8000)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (undoTimer.current) window.clearTimeout(undoTimer.current)
+    }
+  }, [])
+
+  const handleVote = useCallback(async (id: string, action: FeedbackAction) => {
+    setBusyId(id)
+    try {
+      const fb = await sendFeedback(id, action)
+      setMemories((prev) =>
+        prev.map((m) =>
+          m.id === id
+            ? { ...m, confidence: fb.confidence, last_confirmed_at: fb.last_confirmed_at, status: fb.status, kind: fb.kind }
+            : m
+        )
+      )
+      setDetailVersion((v) => v + 1)
+      if (action === 'archive') {
+        showUndo('Memória arquivada — fora da busca, mantida como histórico.', () => {
+          sendFeedback(id, 'unarchive')
+            .then((u) => {
+              setMemories((prev) => prev.map((m) => (m.id === id ? { ...m, status: u.status, confidence: u.confidence } : m)))
+              setDetailVersion((v) => v + 1)
+            })
+            .catch(() => {})
+        })
+      }
+    } catch {
+      /* erro silencioso */
+    } finally {
+      setBusyId(null)
+    }
+  }, [showUndo])
+
+  const handleForget = useCallback(async (id: string) => {
+    setBusyId(id)
+    try {
+      const { trashId } = await forgetMemory(id)
+      setMemories((prev) => prev.filter((m) => m.id !== id))
+      if (selectedId === id) setSelectedId(null)
+      if (trashId) {
+        showUndo('Memória esquecida — não volta a ser extraída.', () => {
+          restoreMemory(trashId)
+            .then(() => reload())
+            .catch(() => {})
+        })
+      }
+    } catch {
+      /* erro silencioso */
+    } finally {
+      setBusyId(null)
+    }
+  }, [selectedId, showUndo, reload])
 
   const slidePage = useCallback((dir: 1 | -1) => {
     const s = swiperRef.current
@@ -252,7 +324,18 @@ export function RecentMemories() {
         memoryId={selectedId}
         onClose={() => setSelectedId(null)}
         getMemory={getMemory}
+        onVote={handleVote}
+        onForget={handleForget}
+        busy={busyId === selectedId}
+        refreshKey={detailVersion}
       />
+      {undo && (
+        <UndoBar
+          message={undo.message}
+          onUndo={() => { const run = undo.run; setUndo(null); run() }}
+          onDismiss={() => setUndo(null)}
+        />
+      )}
         </motion.div>
       )}
     </AnimatePresence>

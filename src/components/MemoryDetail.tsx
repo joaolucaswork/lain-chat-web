@@ -8,18 +8,25 @@ import {
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { formatDateTime } from '@/lib/utils'
-import type { Memory } from '@/types'
+import { formatDateTime, cn } from '@/lib/utils'
+import type { Memory, FeedbackAction } from '@/types'
+import { feedbackOf } from '@/types'
+import { Check, ClockCounterClockwise, X } from '@phosphor-icons/react'
 
 interface MemoryDetailProps {
   memoryId: string | null
   onClose: () => void
   getMemory: (id: string) => Promise<(Memory & { body?: string }) | null>
+  onVote?: (id: string, action: FeedbackAction) => void
+  onForget?: (id: string) => void
+  busy?: boolean
+  refreshKey?: number
 }
 
-export function MemoryDetail({ memoryId, onClose, getMemory }: MemoryDetailProps) {
+export function MemoryDetail({ memoryId, onClose, getMemory, onVote, onForget, busy, refreshKey }: MemoryDetailProps) {
   const [data, setData] = useState<(Memory & { body?: string }) | null>(null)
   const [loading, setLoading] = useState(false)
+  const [confirmingForget, setConfirmingForget] = useState(false)
 
   useEffect(() => {
     if (!memoryId) {
@@ -27,11 +34,12 @@ export function MemoryDetail({ memoryId, onClose, getMemory }: MemoryDetailProps
       return
     }
     setLoading(true)
+    setConfirmingForget(false)
     getMemory(memoryId).then((d) => {
       setData(d)
       setLoading(false)
     })
-  }, [memoryId, getMemory])
+  }, [memoryId, getMemory, refreshKey])
 
   const linkify = (text: string) =>
     text.replace(/\[\[([^\]]+)\]\]/g, '<a href="javascript:void(0)" class="text-primary hover:underline">$1</a>')
@@ -86,6 +94,93 @@ export function MemoryDetail({ memoryId, onClose, getMemory }: MemoryDetailProps
                 __html: linkify((data.body || '').trim()),
               }}
             />
+            {(onVote || onForget) && (() => {
+              const fb = feedbackOf(data)
+              return (
+                <div className="mt-6 border-t border-border pt-4">
+                  <div className="mb-3 text-xs text-muted-foreground">
+                    {fb.status === 'archived' ? (
+                      <span>Arquivada — fora da busca, mantida como histórico.</span>
+                    ) : fb.confidence >= 1 ? (
+                      <span>
+                        Confirmada{fb.last_confirmed_at ? ` em ${formatDateTime(fb.last_confirmed_at)}` : ''} — protegida do esquecimento.
+                      </span>
+                    ) : (
+                      <span>Sem voto — vale o peso normal no ranking.</span>
+                    )}
+                    {fb.kind === 'state' && (
+                      <span> Estado temporário: perde peso com o tempo.</span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {onVote && (
+                      <>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => onVote(data.id, 'confirm')}
+                          className={cn(
+                            'inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm transition-colors disabled:opacity-50',
+                            fb.confidence >= 1
+                              ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                              : 'border-border text-muted-foreground hover:text-emerald-600 hover:border-emerald-500/50'
+                          )}
+                        >
+                          <Check className="size-4" weight="bold" />
+                          {fb.confidence >= 1 ? 'Confirmada' : 'Correta'}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => onVote(data.id, fb.status === 'archived' ? 'unarchive' : 'archive')}
+                          className={cn(
+                            'inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm transition-colors disabled:opacity-50',
+                            fb.status === 'archived'
+                              ? 'border-amber-500/50 bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                              : 'border-border text-muted-foreground hover:text-amber-600 hover:border-amber-500/50'
+                          )}
+                        >
+                          <ClockCounterClockwise className="size-4" />
+                          {fb.status === 'archived' ? 'Desarquivar' : 'Não é mais assim'}
+                        </button>
+                      </>
+                    )}
+                    {onForget && (
+                      confirmingForget ? (
+                        <span className="inline-flex items-center gap-2 rounded-md border border-destructive/50 px-3 py-1.5 text-sm">
+                          <span className="text-muted-foreground">Apagar e não trazer de volta?</span>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => { setConfirmingForget(false); onForget(data.id) }}
+                            className="font-medium text-destructive hover:underline disabled:opacity-50"
+                          >
+                            esquecer
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmingForget(false)}
+                            className="text-muted-foreground hover:text-foreground"
+                          >
+                            manter
+                          </button>
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => setConfirmingForget(true)}
+                          className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-destructive hover:border-destructive/50 disabled:opacity-50"
+                        >
+                          <X className="size-4" weight="bold" />
+                          Esquecer
+                        </button>
+                      )
+                    )}
+                  </div>
+                </div>
+              )
+            })()}
           </>
         ) : null}
         </motion.div>

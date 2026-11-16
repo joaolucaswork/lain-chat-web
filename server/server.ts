@@ -885,7 +885,7 @@ async function processMessage(session: Session, userMessage: string, signal?: Ab
 
 // ─── Vault mapping (lain-memory → formato da UI) ───
 
-interface VaultMemory { id: string; file: string; project: string; tags: string[]; created: string; preview: string }
+interface VaultMemory { id: string; file: string; project: string; tags: string[]; created: string; preview: string; confidence: number; last_confirmed_at: string | null; status: 'active' | 'archived'; kind: 'fact' | 'state' }
 
 async function discoverMemoryProjects(): Promise<string[]> {
   try {
@@ -918,6 +918,10 @@ async function listVaultMemories(): Promise<VaultMemory[]> {
         id: m.id, file: '', project: projectLabel, tags: [],
         created: m.created_at ?? '',
         preview: body.slice(0, 200) + (body.length > 200 ? '...' : ''),
+        confidence: typeof m.confidence === 'number' ? m.confidence : 0.5,
+        last_confirmed_at: typeof m.last_confirmed_at === 'string' ? m.last_confirmed_at : null,
+        status: m.status === 'archived' ? 'archived' : 'active',
+        kind: m.kind === 'state' ? 'state' : 'fact',
       });
     }
   };
@@ -1192,7 +1196,55 @@ Bun.serve({
         const full = await fetchJson(`${MEMORY_URL}/api/memory/list`, { ...scope, limit: 500 })
           .then((d: any[]) => (Array.isArray(d) ? d : []).find((m: any) => m.id === id))
           .catch(() => null);
-        return json({ id: found.id, project: found.project, created: found.created, file: '', tags: [], body: full?.memory ?? found.preview });
+        const { ...rest } = found;
+        return json({ ...rest, file: '', tags: [], body: full?.memory ?? found.preview });
+      } catch {
+        return json({ error: 'lain-memory unavailable' }, 502);
+      }
+    }
+
+    // ── Vault: feedback (✓/🕐) — proxy para lain-memory ──
+    if (req.method === 'POST' && path.startsWith('/api/vault/memory/') && path.endsWith('/feedback')) {
+      const id = decodeURIComponent(path.slice('/api/vault/memory/'.length, -'/feedback'.length));
+      let body: Record<string, unknown>;
+      try { body = await req.json(); } catch { return json({ error: 'Invalid JSON' }, 400); }
+      const action = body.action;
+      if (action !== 'confirm' && action !== 'archive' && action !== 'unarchive') {
+        return json({ error: 'action must be confirm|archive|unarchive' }, 400);
+      }
+      const kind = body.kind === 'state' || body.kind === 'fact' ? body.kind : undefined;
+      try {
+        const fb = await fetchJson(`${MEMORY_URL}/api/memory/feedback`, { id, action, ...(kind ? { kind } : {}) }, 10_000);
+        return json(fb);
+      } catch {
+        return json({ error: 'lain-memory unavailable' }, 502);
+      }
+    }
+
+    // ── Vault: forget (✕) — trash + blocklist, retorna trashId para undo ──
+    if (req.method === 'DELETE' && path.startsWith('/api/vault/memory/')) {
+      const id = decodeURIComponent(path.slice('/api/vault/memory/'.length));
+      try {
+        const all = await listVaultMemories();
+        const found = all.find(m => m.id === id);
+        const scope = found && found.project !== 'global' ? { project: found.project } : {};
+        const res = await fetchJson(`${MEMORY_URL}/api/memory/forget`, { memory_id: id, ...scope }, 10_000);
+        return json(res);
+      } catch {
+        return json({ error: 'lain-memory unavailable' }, 502);
+      }
+    }
+
+    // ── Vault: restore (undo do ✕, 7d) ──
+    if (req.method === 'POST' && path === '/api/vault/restore') {
+      let body: Record<string, unknown>;
+      try { body = await req.json(); } catch { return json({ error: 'Invalid JSON' }, 400); }
+      if (typeof body.trash_id !== 'string' || !body.trash_id) {
+        return json({ error: 'trash_id required' }, 400);
+      }
+      try {
+        const res = await fetchJson(`${MEMORY_URL}/api/memory/restore`, { memory_id: body.trash_id }, 10_000);
+        return json(res);
       } catch {
         return json({ error: 'lain-memory unavailable' }, 502);
       }

@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
-import type { Memory, GraphNode } from '@/types'
+import type { Memory, GraphNode, FeedbackAction, MemoryKind } from '@/types'
+import { sendFeedback, forgetMemory, restoreMemory } from '@/lib/memoryApi'
 
 export function useMemories() {
   const [memories, setMemories] = useState<Memory[]>([])
@@ -47,5 +48,36 @@ export function useMemories() {
     }
   }, [])
 
-  return { memories, graphNodes, loading, error, load, getMemory, getGraphNode }
+  const patchMemory = useCallback((id: string, patch: Partial<Memory>) => {
+    setMemories((prev) => prev.map((m) => (m.id === id ? { ...m, ...patch } : m)))
+  }, [])
+
+  const vote = useCallback(async (id: string, action: FeedbackAction, kind?: MemoryKind) => {
+    const fb = await sendFeedback(id, action, kind)
+    patchMemory(id, {
+      confidence: fb.confidence,
+      last_confirmed_at: fb.last_confirmed_at,
+      status: fb.status,
+      kind: fb.kind,
+    })
+    return fb
+  }, [patchMemory])
+
+  const forget = useCallback(async (id: string) => {
+    const res = await forgetMemory(id)
+    let removed: Memory | null = null
+    setMemories((prev) => {
+      removed = prev.find((m) => m.id === id) ?? null
+      return prev.filter((m) => m.id !== id)
+    })
+    return { ...res, removed }
+  }, [])
+
+  const restore = useCallback(async (trashId: string) => {
+    const res = await restoreMemory(trashId)
+    await load()
+    return res
+  }, [load])
+
+  return { memories, graphNodes, loading, error, load, getMemory, getGraphNode, vote, forget, restore }
 }

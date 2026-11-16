@@ -1,9 +1,10 @@
-import { useEffect, useState, useMemo, useCallback } from 'react'
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useMemories } from '@/hooks/useMemories'
-import type { Memory } from '@/types'
+import type { Memory, FeedbackAction } from '@/types'
 import { MemoryCard } from '@/components/MemoryCard'
 import { MemoryDetail } from '@/components/MemoryDetail'
 import { GraphDetail } from '@/components/GraphDetail'
+import { UndoBar } from '@/components/UndoBar'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -30,16 +31,71 @@ interface MonthGroup {
 }
 
 export function MemoriesPage() {
-  const { memories, graphNodes, loading, error, load, getMemory, getGraphNode } = useMemories()
+  const { memories, graphNodes, loading, error, load, getMemory, getGraphNode, vote, forget, restore } = useMemories()
   const [search, setSearch] = useState('')
   const [activeProject, setActiveProject] = useState('')
   const [activeTag, setActiveTag] = useState('')
   const [selectedMemoryId, setSelectedMemoryId] = useState<string | null>(null)
   const [selectedGraphKey, setSelectedGraphKey] = useState<string | null>(null)
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [detailVersion, setDetailVersion] = useState(0)
+  const [undo, setUndo] = useState<{ message: string; run: () => void } | null>(null)
+  const undoTimer = useRef<number | null>(null)
 
   useEffect(() => {
     load()
   }, [load])
+
+  useEffect(() => {
+    return () => {
+      if (undoTimer.current) window.clearTimeout(undoTimer.current)
+    }
+  }, [])
+
+  const showUndo = useCallback((message: string, run: () => void) => {
+    if (undoTimer.current) window.clearTimeout(undoTimer.current)
+    setUndo({ message, run })
+    undoTimer.current = window.setTimeout(() => setUndo(null), 8000)
+  }, [])
+
+  const dismissUndo = useCallback(() => {
+    if (undoTimer.current) window.clearTimeout(undoTimer.current)
+    setUndo(null)
+  }, [])
+
+  const handleVote = useCallback(async (id: string, action: FeedbackAction) => {
+    setBusyId(id)
+    try {
+      await vote(id, action)
+      setDetailVersion((v) => v + 1)
+      if (action === 'archive') {
+        showUndo('Memória arquivada — fora da busca, mantida como histórico.', () => {
+          vote(id, 'unarchive').then(() => setDetailVersion((v) => v + 1)).catch(() => {})
+        })
+      }
+    } catch {
+      /* erro silencioso: estado local não muda */
+    } finally {
+      setBusyId(null)
+    }
+  }, [vote, showUndo])
+
+  const handleForget = useCallback(async (id: string) => {
+    setBusyId(id)
+    try {
+      const { trashId } = await forget(id)
+      if (selectedMemoryId === id) setSelectedMemoryId(null)
+      if (trashId) {
+        showUndo('Memória esquecida — não volta a ser extraída.', () => {
+          restore(trashId).catch(() => {})
+        })
+      }
+    } catch {
+      /* erro silencioso: item continua na lista */
+    } finally {
+      setBusyId(null)
+    }
+  }, [forget, restore, selectedMemoryId, showUndo])
 
   const filtered = useMemo(() => {
     let f = memories
@@ -126,7 +182,7 @@ export function MemoriesPage() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col relative">
       <div className="flex shrink-0 items-center gap-3 border-b border-border bg-card px-4 py-2">
         <SidebarTrigger />
       </div>
@@ -236,6 +292,9 @@ export function MemoriesPage() {
                             key={m.id}
                             memory={m}
                             onClick={setSelectedMemoryId}
+                            onVote={handleVote}
+                            onForget={handleForget}
+                            busy={busyId === m.id}
                           />
                         ))}
                       </div>
@@ -252,12 +311,23 @@ export function MemoriesPage() {
         memoryId={selectedMemoryId}
         onClose={() => setSelectedMemoryId(null)}
         getMemory={getMemory}
+        onVote={handleVote}
+        onForget={handleForget}
+        busy={busyId === selectedMemoryId}
+        refreshKey={detailVersion}
       />
       <GraphDetail
         nodeKey={selectedGraphKey}
         onClose={() => setSelectedGraphKey(null)}
         getNode={getGraphNode}
       />
+      {undo && (
+        <UndoBar
+          message={undo.message}
+          onUndo={() => { const run = undo.run; dismissUndo(); run() }}
+          onDismiss={dismissUndo}
+        />
+      )}
       </div>
     </div>
   )
