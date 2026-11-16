@@ -15,7 +15,10 @@
  *   LAIN_LLM_BASE_URL    — endpoint OpenAI-compatible (default https://openrouter.ai/api/v1)
  *   LAIN_LLM_API_KEY     — chave (fallback OPENROUTER_API_KEY, AI_GATEWAY_API_KEY)
  *   LAIN_LLM_MODEL       — modelo default (default z-ai/glm-5.3-flash)
- *   LAIN_CHAT_PROJECT    — escopo de projeto das memórias (default 'diario' = lucas:diario)
+ *   LAIN_CHAT_PROJECT    — escopo base do chat (default 'diario' = lucas:diario; escrita do remember continua aqui)
+ *   LAIN_CHAT_PROJECTS   — allowlist opcional (csv; 'global' inclui global). Vazio = auto: global + todos os projetos descobertos via grafo (fan-out total, novos projetos entram sozinhos)
+ *   LAIN_CHAT_INCLUDE_GLOBAL — 'on' (default) inclui global no fan-out auto; 'off' restringe aos projetos
+ *   LAIN_CHAT_RECALL_PER_PROJECT — topK por escopo no recall fan-out (default 8; total fatiado em ~20)
  *   LAIN_CHAT_TEMPERATURE — temperatura do chat (default 0.7; título continua 0.3, extração 0)
  *   remember usa mode=chat: só fatos ditos/aceitos pelo usuário; a resposta do modelo não vira memória.
  *   LAIN_GRAPH_AUTO      — 'on' (default) injeta [GRAFO] em paralelo; 'off' volta a só on-demand via tool
@@ -81,6 +84,17 @@ const CHAT_TEMPERATURE = (() => {
 })();
 const GRAPH_AUTO_OFF = ['off', '0', 'false', 'no'].includes((process.env.LAIN_GRAPH_AUTO ?? 'on').toLowerCase());
 const GRAPH_AUTO = !GRAPH_AUTO_OFF;
+/** Fan-out total (Opção A): recall + tools varrem global + todos os projetos.
+ *  LAIN_CHAT_PROJECTS=vazio → auto via grafo; csv → allowlist explícita ('global' = escopo global).
+ *  Escrita (remember) continua só em CHAT_PROJECT — só a leitura amplia. */
+const CHAT_PROJECTS_ALLOWLIST = (process.env.LAIN_CHAT_PROJECTS ?? '')
+  .split(',').map((s) => s.trim()).filter(Boolean);
+const CHAT_INCLUDE_GLOBAL_AUTO_OFF = ['off', '0', 'false', 'no'].includes(
+  (process.env.LAIN_CHAT_INCLUDE_GLOBAL ?? 'on').toLowerCase());
+const CHAT_RECALL_PER_PROJECT = (() => {
+  const v = parseInt(process.env.LAIN_CHAT_RECALL_PER_PROJECT ?? '8', 10);
+  return Number.isFinite(v) ? Math.min(Math.max(v, 1), 15) : 8;
+})();
 const FRONTEND_DIST = process.env.FRONTEND_DIST || join(_dir, '..', 'dist');
 const SESSIONS_DIR = process.env.SESSIONS_DIR || join(_dir, 'data', 'sessions');
 const SETTINGS_FILE = process.env.SETTINGS_FILE || join(_dir, 'data', 'settings.json');
@@ -300,7 +314,7 @@ function memGetHeaders(): Record<string, string> {
 
 // ─── Memory (lain-memory :3341, best-effort) ───
 
-interface MemoryHit { id: string; memory: string; score?: number; created_at?: string; updated_at?: string }
+interface MemoryHit { id: string; memory: string; score?: number; created_at?: string; updated_at?: string; project?: string }
 
 /** Tira framing interrogativo PT para o recall não enterrar keywords.
  *  Ex: "sabe que eu tenho uma cadelinha?" → "eu tenho uma cadelinha" (acha Ariel 0.36;
@@ -314,23 +328,37 @@ function stripQuestionFraming(q: string): string {
 }
 
 async function recallMemories(query: string): Promise<MemoryHit[]> {
-  // Recall duplo em paralelo: frase original + versão sem framing. Merge por id (maior score).
+  // Fan-out total: frase original + versão sem framing, em global + cada projeto.
+  // Merge por id (maior score), tag de origem em h.project. Best-effort por escopo.
   const queries = [query];
   const stripped = stripQuestionFraming(query);
   if (stripped.length >= 12 && stripped !== query.toLowerCase().trim()) queries.push(stripped);
+  const { includeGlobal, projects } = await getChatScopes();
+  const scopes: Array<string | undefined> = [...(includeGlobal ? [undefined] : []), ...projects];
+  if (scopes.length === 0) scopes.push(CHAT_PROJECT || undefined);
   try {
-    const results = await Promise.all(queries.map(q =>
-      fetchJson(`${MEMORY_URL}/api/memory/recall`,
-        { query: q, project: CHAT_PROJECT || undefined, limit: 15, cached: true })));
-    const merged = new Map<string, MemoryHit>();
-    for (const data of results) {
-      if (!Array.isArray(data)) continue;
-      for (const h of (data as MemoryHit[])) {
-        const prev = merged.get(h.id);
-        if (!prev || (h.score ?? 0) > (prev.score ?? 0)) merged.set(h.id, h);
+    const calls: Array<Promise<{ scope: string | undefined; data: unknown }>> = [];
+    for (const scope of scopes) {
+      for (const q of queries) {
+        const body = scope
+          ? { query: q, project: scope, limit: CHAT_RECALL_PER_PROJECT, cached: true }
+          : { query: q, limit: CHAT_RECALL_PER_PROJECT, cached: true };
+        calls.push(fetchJson(`${MEMORY_URL}/api/memory/recall`, body)
+          .then((data) => ({ scope, data }))
+          .catch(() => ({ scope, data: [] as unknown })));
       }
     }
-    return [...merged.values()].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+    const results = await Promise.all(calls);
+    const merged = new Map<string, MemoryHit>();
+    for (const { scope, data } of results) {
+      if (!Array.isArray(data)) continue;
+      for (const h of (data as MemoryHit[])) {
+        const tagged: MemoryHit = { ...h, project: h.project ?? scope ?? 'global' };
+        const prev = merged.get(tagged.id);
+        if (!prev || (tagged.score ?? 0) > (prev.score ?? 0)) merged.set(tagged.id, tagged);
+      }
+    }
+    return [...merged.values()].sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).slice(0, 20);
   } catch (err) {
     console.error('[bff] recall failed (following without memory):', err instanceof Error ? err.message : err);
     return [];
@@ -348,15 +376,17 @@ function memDate(m: { updated_at?: string | null; created_at?: string | null }):
 function buildMemoryBlock(hits: MemoryHit[], graphMd?: string): string {
   const parts: string[] = [];
   if (hits.length > 0) {
-    // Teto de ~4000 chars: com limit 15 o bloco cresceria sem controle no prompt.
-    // Data entre colchetes = quando foi salvo (registro), não necessariamente quando aconteceu.
+    // Teto de ~4000 chars: com fan-out o bloco cresceria sem controle no prompt.
+    // Tag [projeto] = escopo de origem (global/diario/lain-memory/...); data = quando foi salvo.
     // O "quando aconteceu" continua vindo do texto da memória (ex "Na época...", "Antes...").
     const today = new Date().toISOString().slice(0, 10);
     const body = hits.map(h => {
       const d = memDate(h);
-      return `- ${d ? `[${d}] ` : ''}${h.memory}`;
+      const proj = (h.project ?? '').trim();
+      const tag = proj ? (d ? `[${proj} ${d}]` : `[${proj}]`) : (d ? `[${d}]` : '');
+      return `- ${tag ? `${tag} ` : ''}${h.memory}`;
     }).join('\n').slice(0, 4000);
-    parts.push(`[MEMORIAS RELEVANTES — hoje é ${today}; data entre colchetes = quando a memória foi salva]\n` + body);
+    parts.push(`[MEMORIAS RELEVANTES — hoje é ${today}; [projeto data] = escopo de origem + quando a memória foi salva]\n` + body);
   }
   const g = (graphMd ?? '').trim();
   if (g) {
@@ -516,11 +546,12 @@ const MEM_TOOLS: Array<Record<string, unknown>> = [
     type: 'function',
     function: {
       name: 'list_memories',
-      description: 'Lista as memórias salvas de longo prazo. Chame quando o usuário perguntar o que está salvo/lembrado.',
+      description: 'Lista as memórias salvas de longo prazo em TODOS os escopos (global + todos os projetos). Chame quando o usuário perguntar o que está salvo/lembrado.',
       parameters: {
         type: 'object',
         properties: {
           limit: { type: 'number', description: 'Máximo de memórias (default 20, máx 50)' },
+          project: { type: 'string', description: 'Opcional: restringe a um escopo ("global", "diario", "lain-memory", ...). Omitido = todos.' },
         },
       },
     },
@@ -529,12 +560,13 @@ const MEM_TOOLS: Array<Record<string, unknown>> = [
     type: 'function',
     function: {
       name: 'search_memories',
-      description: 'Busca nas memórias salvas por keywords. Chame com palavras-chave da pergunta (ex "cadela", "Ariel") ANTES de dizer que algo não está salvo.',
+      description: 'Busca nas memórias salvas em TODOS os escopos (global + todos os projetos) por keywords. Chame com palavras-chave da pergunta (ex "cadela", "Ariel") ANTES de dizer que algo não está salvo.',
       parameters: {
         type: 'object',
         properties: {
           query: { type: 'string', description: 'Keywords para buscar (ex "cadela Ariel")' },
           limit: { type: 'number', description: 'Máximo de resultados (default 8, máx 15)' },
+          project: { type: 'string', description: 'Opcional: restringe a um escopo ("global", "diario", "lain-memory", ...). Omitido = todos.' },
         },
         required: ['query'],
       },
@@ -568,20 +600,52 @@ const MEM_TOOLS: Array<Record<string, unknown>> = [
 async function execLlmTool(tc: LlmToolCall): Promise<string> {
   if (tc.name === 'list_memories') {
     let limit = 20;
+    let onlyScope: string | undefined;
     try {
-      const a = JSON.parse(tc.args || '{}') as { limit?: number };
+      const a = JSON.parse(tc.args || '{}') as { limit?: number; project?: string };
       if (typeof a.limit === 'number') limit = Math.min(Math.max(a.limit, 1), 50);
+      if (typeof a.project === 'string' && a.project.trim()) onlyScope = a.project.trim();
     } catch { /* args padrão */ }
+    const fmt = (m: any, i: number, scope: string) => {
+      const d = memDate(m);
+      return `${i + 1}. [${scope}] ${m.memory ?? ''}${d ? ` (${d})` : ''}`;
+    };
     try {
-      const data = await fetchJson(`${MEMORY_URL}/api/memory/list`, { project: CHAT_PROJECT || undefined, limit }, 10_000);
-      const items = Array.isArray(data) ? data : [];
-      if (items.length === 0) return 'Nenhuma memória salva.';
+      // Escopo único explícito (tool pediu project)
+      if (onlyScope) {
+        const isGlobal = onlyScope.toLowerCase() === 'global';
+        const data = await fetchJson(`${MEMORY_URL}/api/memory/list`,
+          isGlobal ? { limit } : { project: onlyScope, limit }, 10_000);
+        const items = Array.isArray(data) ? data : [];
+        if (items.length === 0) return 'Nenhuma memória salva.';
+        items.sort((a: any, b: any) => String(b.created_at ?? '').localeCompare(String(a.created_at ?? '')));
+        return items.slice(0, limit).map((m: any, i: number) => fmt(m, i, isGlobal ? 'global' : onlyScope as string)).join('\n').slice(0, 6000);
+      }
+      // Fan-out total: global + todos os projetos (best-effort por escopo)
+      const { includeGlobal, projects } = await getChatScopes();
+      const scopes: Array<string | undefined> = [...(includeGlobal ? [undefined] : []), ...projects];
+      if (scopes.length === 0) scopes.push(CHAT_PROJECT || undefined);
+      const perScope = Math.min(Math.max(Math.ceil(limit / Math.max(scopes.length, 1)), 5), 50);
+      const batches = await Promise.all(scopes.map(async (scope) => {
+        try {
+          const data = await fetchJson(`${MEMORY_URL}/api/memory/list`,
+            scope ? { project: scope, limit: perScope } : { limit: perScope }, 10_000);
+          return { scope: scope ?? 'global', items: Array.isArray(data) ? data : [] };
+        } catch { return { scope: scope ?? 'global', items: [] as any[] }; }
+      }));
+      const seen = new Set<string>();
+      const all: Array<{ m: any; scope: string }> = [];
+      for (const b of batches) {
+        for (const m of b.items) {
+          if (!m?.id || seen.has(m.id)) continue;
+          seen.add(m.id);
+          all.push({ m, scope: b.scope });
+        }
+      }
+      if (all.length === 0) return 'Nenhuma memória salva.';
       // /api/memory/list não garante ordem — mais recentes primeiro.
-      items.sort((a: any, b: any) => String(b.created_at ?? '').localeCompare(String(a.created_at ?? '')));
-      return items.map((m: any, i: number) => {
-        const d = memDate(m);
-        return `${i + 1}. ${m.memory ?? ''}${d ? ` (${d})` : ''}`;
-      }).join('\n').slice(0, 6000);
+      all.sort((a, b) => String(b.m.created_at ?? '').localeCompare(String(a.m.created_at ?? '')));
+      return all.slice(0, limit).map(({ m, scope }, i) => fmt(m, i, scope)).join('\n').slice(0, 6000);
     } catch {
       return 'Memória indisponível no momento.';
     }
@@ -590,21 +654,48 @@ async function execLlmTool(tc: LlmToolCall): Promise<string> {
   if (tc.name === 'search_memories') {
     let q = '';
     let limit = 8;
+    let onlyScope: string | undefined;
     try {
-      const a = JSON.parse(tc.args || '{}') as { query?: string; limit?: number };
+      const a = JSON.parse(tc.args || '{}') as { query?: string; limit?: number; project?: string };
       q = a.query ?? '';
       if (typeof a.limit === 'number') limit = Math.min(Math.max(a.limit, 1), 15);
+      if (typeof a.project === 'string' && a.project.trim()) onlyScope = a.project.trim();
     } catch { /* vazio */ }
     if (!q.trim()) return 'Informe as keywords para buscar nas memórias.';
+    const fmt = (m: any, i: number, scope: string) => {
+      const d = memDate(m);
+      return `${i + 1}. [${scope}] ${m.memory ?? ''}${d ? ` (${d})` : ''}`;
+    };
     try {
-      const data = await fetchJson(`${MEMORY_URL}/api/memory/recall`,
-        { query: q, project: CHAT_PROJECT || undefined, limit }, 10_000);
-      const items = Array.isArray(data) ? data : [];
+      if (onlyScope) {
+        const isGlobal = onlyScope.toLowerCase() === 'global';
+        const data = await fetchJson(`${MEMORY_URL}/api/memory/recall`,
+          isGlobal ? { query: q, limit } : { query: q, project: onlyScope, limit }, 10_000);
+        const items = Array.isArray(data) ? data : [];
+        if (items.length === 0) return 'Nenhuma memória encontrada para essa busca.';
+        return items.slice(0, limit).map((m: any, i: number) => fmt(m, i, isGlobal ? 'global' : onlyScope as string)).join('\n').slice(0, 4000);
+      }
+      const { includeGlobal, projects } = await getChatScopes();
+      const scopes: Array<string | undefined> = [...(includeGlobal ? [undefined] : []), ...projects];
+      if (scopes.length === 0) scopes.push(CHAT_PROJECT || undefined);
+      const batches = await Promise.all(scopes.map(async (scope) => {
+        try {
+          const data = await fetchJson(`${MEMORY_URL}/api/memory/recall`,
+            scope ? { query: q, project: scope, limit } : { query: q, limit }, 10_000);
+          return { scope: scope ?? 'global', items: Array.isArray(data) ? data : [] };
+        } catch { return { scope: scope ?? 'global', items: [] as any[] }; }
+      }));
+      const merged = new Map<string, { m: any; scope: string }>();
+      for (const b of batches) {
+        for (const m of b.items) {
+          if (!m?.id) continue;
+          const prev = merged.get(m.id);
+          if (!prev || (m.score ?? 0) > (prev.m.score ?? 0)) merged.set(m.id, { m, scope: (m as any).project ?? b.scope });
+        }
+      }
+      const items = [...merged.values()].sort((a, b) => (b.m.score ?? 0) - (a.m.score ?? 0)).slice(0, limit);
       if (items.length === 0) return 'Nenhuma memória encontrada para essa busca.';
-      return items.map((m: any, i: number) => {
-        const d = memDate(m);
-        return `${i + 1}. ${m.memory ?? ''}${d ? ` (${d})` : ''}`;
-      }).join('\n').slice(0, 4000);
+      return items.map(({ m, scope }, i) => fmt(m, i, scope)).join('\n').slice(0, 4000);
     } catch {
       return 'Memória indisponível no momento.';
     }
@@ -839,8 +930,10 @@ async function processMessage(session: Session, userMessage: string, signal?: Ab
   const [hits, graphMd] = await Promise.all([recallMemories(userMessage), queryGraph(userMessage)]);
   if (signal?.aborted) return;
   const memBlock = buildMemoryBlock(hits, graphMd);
+  const byScope = new Map<string, number>();
+  for (const h of hits) byScope.set(h.project ?? '?', (byScope.get(h.project ?? '?') ?? 0) + 1);
   console.log(`[bff] memblock: ${hits.length} hits${graphMd ? ' +graph' : ''}` +
-    (hits.length ? ` dates=[${hits.map(h => memDate(h) || 'sem-data').join(',')}]` : ''));
+    (hits.length ? ` scopes=[${[...byScope.entries()].map(([s, n]) => `${s}:${n}`).join(',')}]` : ''));
 
   // 2. Monta contexto: system + memórias + histórico recente (sem acumular no session)
   // Data de hoje vai sempre — mesmo com recall vazio — para o LLM resolver "hoje/ontem".
@@ -912,6 +1005,28 @@ async function discoverMemoryProjects(): Promise<string[]> {
   } catch {
     return CHAT_PROJECT ? [CHAT_PROJECT] : [];
   }
+}
+
+/** Escopos de leitura do chat (fan-out total, Opção A).
+ *  - LAIN_CHAT_PROJECTS=vazio → auto: global (+flag) + discoverMemoryProjects().
+ *  - LAIN_CHAT_PROJECTS=csv → allowlist explícita; 'global' no csv inclui o global.
+ *  Cache de 60s: o recall roda por mensagem, não pode bater em /graph/nodes sempre. */
+let _chatScopesCache: { at: number; value: { includeGlobal: boolean; projects: string[] } } | null = null;
+async function getChatScopes(): Promise<{ includeGlobal: boolean; projects: string[] }> {
+  const now = Date.now();
+  if (_chatScopesCache && now - _chatScopesCache.at < 60_000) return _chatScopesCache.value;
+  let value: { includeGlobal: boolean; projects: string[] };
+  if (CHAT_PROJECTS_ALLOWLIST.length > 0) {
+    const lower = CHAT_PROJECTS_ALLOWLIST.map((s) => s.toLowerCase());
+    value = {
+      includeGlobal: lower.includes('global'),
+      projects: CHAT_PROJECTS_ALLOWLIST.filter((s) => s.toLowerCase() !== 'global'),
+    };
+  } else {
+    value = { includeGlobal: !CHAT_INCLUDE_GLOBAL_AUTO_OFF, projects: await discoverMemoryProjects() };
+  }
+  _chatScopesCache = { at: now, value };
+  return value;
 }
 
 async function listVaultMemories(): Promise<VaultMemory[]> {
