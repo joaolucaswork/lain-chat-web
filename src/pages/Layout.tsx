@@ -381,7 +381,7 @@ export function Layout() {
   const chatsPanel = (withToggle: boolean) => (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 items-center justify-between px-3 pt-3 pb-2">
-        <span className="px-1 text-sm font-semibold text-zinc-200">
+        <span className="px-1 text-sm font-semibold text-sidebar-foreground">
           Conversas
         </span>
         {withToggle && (
@@ -405,8 +405,8 @@ export function Layout() {
           <>
             {favorites.length > 0 && (
               <div className="mb-1">
-                <div className="flex items-center gap-1.5 px-2 pt-1 pb-1.5 opacity-80">
-                  <span className="text-xs font-medium text-zinc-400">
+                <div className="flex items-center gap-1.5 px-2 pt-1 pb-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">
                     Favoritos
                   </span>
                 </div>
@@ -418,8 +418,8 @@ export function Layout() {
             {(favorites.length === 0 || rest.length > 0) && (
               <div>
                 {favorites.length > 0 && rest.length > 0 && (
-                  <div className="px-2 pt-2 pb-1.5 opacity-80">
-                    <span className="text-xs font-medium text-zinc-400">
+                  <div className="px-2 pt-2 pb-1.5">
+                    <span className="text-xs font-medium text-muted-foreground">
                       Conversas
                     </span>
                   </div>
@@ -536,7 +536,7 @@ export function Layout() {
       )}
 
       {/* Conteúdo */}
-      <div className="flex min-h-0 flex-1 flex-col bg-background dark:bg-[#131416]">
+      <div className="flex min-h-0 flex-1 flex-col bg-background">
         <Outlet
           context={
             {

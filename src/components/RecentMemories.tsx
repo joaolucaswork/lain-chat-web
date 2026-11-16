@@ -5,7 +5,7 @@ import { Swiper, SwiperSlide } from 'swiper/react'
 import type { Swiper as SwiperType } from 'swiper'
 import { FreeMode } from 'swiper/modules'
 import 'swiper/css'
-import { CaretLeft, CaretRight } from '@phosphor-icons/react'
+import { CaretDown, CaretLeft, CaretRight, DotsThree, EyeSlash } from '@phosphor-icons/react'
 import type { Memory, FeedbackAction } from '@/types'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -13,6 +13,20 @@ import { MemoryDetail } from '@/components/MemoryDetail'
 import { UndoBar } from '@/components/UndoBar'
 import { formatDateTime } from '@/lib/utils'
 import { sendFeedback, forgetMemory, restoreMemory } from '@/lib/memoryApi'
+
+const HIDDEN_HOME_KEY = 'lain-hidden-home-memories'
+const COLLAPSED_HOME_KEY = 'lain-memories-home-collapsed'
+
+function loadHiddenHomeIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem(HIDDEN_HOME_KEY)
+    if (!raw) return new Set()
+    const arr = JSON.parse(raw)
+    return new Set(Array.isArray(arr) ? arr.filter((v) => typeof v === 'string') : [])
+  } catch {
+    return new Set()
+  }
+}
 
 export function RecentMemories() {
   const [memories, setMemories] = useState<Memory[]>([])
@@ -26,6 +40,14 @@ export function RecentMemories() {
   const [showRight, setShowRight] = useState(false)
   const [activeIdx, setActiveIdx] = useState(0)
   const [dragging, setDragging] = useState(false)
+  const [menuId, setMenuId] = useState<string | null>(null)
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(COLLAPSED_HOME_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
   const swiperRef = useRef<SwiperType | null>(null)
   const downPos = useRef<{ x: number; y: number } | null>(null)
   const navigate = useNavigate()
@@ -41,6 +63,7 @@ export function RecentMemories() {
     try {
       const r = await fetch('/api/vault/memories')
       const data: Memory[] = r.ok ? await r.json() : []
+      const hidden = loadHiddenHomeIds()
       const sorted = [...(Array.isArray(data) ? data : [])].sort((a, b) => {
         const ta = Date.parse(a.created || '')
         const tb = Date.parse(b.created || '')
@@ -49,7 +72,7 @@ export function RecentMemories() {
         if (Number.isNaN(tb)) return -1
         return tb - ta
       })
-      setMemories(sorted.slice(0, 12))
+      setMemories(sorted.filter((m) => !hidden.has(m.id)).slice(0, 12))
     } catch {
       /* mantém lista atual */
     } finally {
@@ -138,11 +161,44 @@ export function RecentMemories() {
     }
   }, [selectedId, showUndo, reload])
 
+  const handleHideHome = useCallback((id: string) => {
+    try {
+      const hidden = loadHiddenHomeIds()
+      hidden.add(id)
+      localStorage.setItem(HIDDEN_HOME_KEY, JSON.stringify([...hidden]))
+    } catch {}
+    setMenuId(null)
+    setMemories((prev) => prev.filter((m) => m.id !== id))
+    if (selectedId === id) setSelectedId(null)
+    showUndo('Memória ocultada da home.', () => {
+      try {
+        const hidden = loadHiddenHomeIds()
+        hidden.delete(id)
+        localStorage.setItem(HIDDEN_HOME_KEY, JSON.stringify([...hidden]))
+      } catch {}
+      reload()
+    })
+  }, [selectedId, showUndo, reload])
+
   const slidePage = useCallback((dir: 1 | -1) => {
     const s = swiperRef.current
     if (!s) return
     s.slideTo(s.activeIndex + dir)
   }, [])
+
+  useEffect(() => {
+    if (!menuId) return
+    const close = () => setMenuId(null)
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuId(null)
+    }
+    window.addEventListener('click', close)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('click', close)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [menuId])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -183,7 +239,7 @@ export function RecentMemories() {
             {[0, 1, 2].map((i) => (
               <motion.div
                 key={i}
-                className="flex h-[148px] w-[260px] shrink-0 flex-col gap-2 rounded-xl bg-card p-3.5"
+                className="flex h-[148px] w-[260px] shrink-0 flex-col gap-2 rounded-xl bg-muted p-3.5 dark:bg-input/30"
                 initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.45, delay: 0.1 + i * 0.08, ease: [0.22, 1, 0.36, 1] }}
@@ -211,8 +267,43 @@ export function RecentMemories() {
           transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
         >
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-medium text-muted-foreground">Memórias recentes</h2>
+        <div className="flex items-center gap-0.5">
+          <h2 className="text-sm font-medium text-muted-foreground">Memórias recentes</h2>
+          <button
+            type="button"
+            aria-label={collapsed ? 'Expandir memórias' : 'Recolher memórias'}
+            aria-expanded={!collapsed}
+            onClick={() => {
+              setCollapsed((v) => {
+                try {
+                  localStorage.setItem(COLLAPSED_HOME_KEY, v ? '0' : '1')
+                } catch {}
+                return !v
+              })
+            }}
+            className="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <motion.span
+              initial={false}
+              animate={{ rotate: collapsed ? -90 : 0 }}
+              transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+              className="flex"
+            >
+              <CaretDown className="size-3.5" />
+            </motion.span>
+          </button>
+        </div>
         <div className="flex items-center gap-1.5">
+        <AnimatePresence initial={false}>
+          {!collapsed && (
+            <motion.div
+              key="mem-nav"
+              initial={{ opacity: 0, x: 8 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 8 }}
+              transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+              className="flex items-center gap-1.5"
+            >
           <button
             type="button"
             aria-label="Memórias anteriores"
@@ -231,6 +322,9 @@ export function RecentMemories() {
           >
             <CaretRight className="size-3.5" />
           </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
           <button
             type="button"
             onClick={() => navigate('/memorias')}
@@ -240,6 +334,12 @@ export function RecentMemories() {
           </button>
         </div>
       </div>
+      <motion.div
+        initial={false}
+        animate={{ height: collapsed ? 0 : 'auto', opacity: collapsed ? 0 : 1 }}
+        transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+        className="overflow-hidden"
+      >
       <div className="relative">
         <Swiper
           modules={[FreeMode]}
@@ -274,7 +374,7 @@ export function RecentMemories() {
                 initial={{ opacity: 0, y: 8 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: false, amount: 0.5 }}
-                transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                transition={{ duration: 0.35, delay: Math.min(idx, 5) * 0.06, ease: [0.22, 1, 0.36, 1] }}
                 onPointerDown={(e) => {
                   downPos.current = { x: e.clientX, y: e.clientY }
                 }}
@@ -284,19 +384,47 @@ export function RecentMemories() {
                   if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 8) return
                   setSelectedId(m.id)
                 }}
-                className={`flex h-[148px] cursor-pointer flex-col rounded-xl bg-card p-3.5 text-left select-none transition-all duration-300 hover:bg-accent/60 dark:bg-[#1D1E20] ${dragging && isSide ? 'shadow-[0_12px_32px_rgba(0,0,0,0.14)] dark:shadow-[0_12px_32px_#131416]' : 'shadow-none'}`}
+                className={`group relative flex h-[148px] cursor-pointer flex-col rounded-xl bg-muted p-3.5 text-left select-none transition-all duration-300 hover:bg-accent dark:bg-input/30 dark:hover:bg-input/40 ${dragging && isSide ? 'shadow-[0_12px_32px_rgba(0,0,0,0.14)] dark:shadow-black/40' : 'shadow-none'}`}
               >
-                <div className="mb-1 truncate text-[13px] font-semibold leading-snug text-card-foreground">
+                <button
+                  type="button"
+                  aria-label="Opções da memória"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setMenuId((cur) => (cur === m.id ? null : m.id))
+                  }}
+                  className="absolute top-2 right-2 flex size-6 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-accent hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none [@media(hover:none)]:opacity-100 data-[open=true]:opacity-100"
+                  data-open={menuId === m.id}
+                >
+                  <DotsThree className="size-4" weight="bold" />
+                </button>
+                {menuId === m.id && (
+                  <div
+                    role="menu"
+                    onClick={(e) => e.stopPropagation()}
+                    className="absolute top-9 right-2 z-20 w-44 rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-md"
+                  >
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => handleHideHome(m.id)}
+                      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-accent hover:text-accent-foreground"
+                    >
+                      <EyeSlash className="size-3.5" />
+                      Ocultar da home
+                    </button>
+                  </div>
+                )}
+                <div className="mb-1 truncate pr-7 text-[13px] font-semibold leading-snug text-card-foreground">
                   {m.title || formatDateTime(m.created)}
                 </div>
                 <div className="mb-1.5 text-[11px] text-muted-foreground">
                   {formatDateTime(m.created)} · {m.project}
                 </div>
-                <div className="relative min-h-0 flex-1 overflow-hidden">
+                <div className="min-h-0 flex-1 overflow-hidden">
                   <div className="line-clamp-3 text-[13px] leading-[1.6] text-muted-foreground">
                     {m.preview}
                   </div>
-                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-card to-transparent dark:from-[#1D1E20]" />
                 </div>
                 {(m.tags || []).length > 0 && (
                   <div className="mt-2 flex gap-1 overflow-hidden">
@@ -313,12 +441,13 @@ export function RecentMemories() {
           })}
         </Swiper>
         <div
-          className={`pointer-events-none absolute inset-y-0 left-0 z-10 w-8 bg-gradient-to-r from-background to-transparent transition-opacity duration-300 dark:from-[#131416] ${dragging && showLeft ? 'opacity-100' : 'opacity-0'}`}
+          className={`pointer-events-none absolute inset-y-0 left-0 z-10 w-8 bg-gradient-to-r from-background to-transparent transition-opacity duration-300 ${dragging && showLeft ? 'opacity-100' : 'opacity-0'}`}
         />
         <div
-          className={`pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-background to-transparent transition-opacity duration-300 dark:from-[#131416] ${dragging && showRight ? 'opacity-100' : 'opacity-0'}`}
+          className={`pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-background to-transparent transition-opacity duration-300 ${dragging && showRight ? 'opacity-100' : 'opacity-0'}`}
         />
       </div>
+      </motion.div>
 
       <MemoryDetail
         memoryId={selectedId}

@@ -128,9 +128,9 @@ export function ChatMessages({ messages, processing, onRetry }: ChatMessagesProp
                   <Message align="end">
                     <MessageContent>
                       <Bubble
-                        variant="default"
+                        variant="secondary"
                         align="end"
-                        className="*:data-[slot=bubble-content]:bg-foreground/85 *:data-[slot=bubble-content]:text-background"
+                        className="*:data-[slot=bubble-content]:bg-[#E4E4E7] *:data-[slot=bubble-content]:text-zinc-900 dark:*:data-[slot=bubble-content]:bg-[#2E2F31] dark:*:data-[slot=bubble-content]:text-neutral-100"
                       >
                         <BubbleContent className="whitespace-pre-wrap text-[16px] font-[360] leading-[1.8] tracking-[0.015em]">
                           {msg.content}
