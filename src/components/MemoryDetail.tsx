@@ -97,8 +97,10 @@ export function MemoryDetail({ memoryId, onClose, getMemory, onVote, onForget, b
             />
             {(onVote || onForget) && (() => {
               const fb = feedbackOf(data)
+              const showStatus = fb.status === 'archived' || fb.confidence >= 1 || fb.kind === 'state'
               return (
                 <div className="mt-6 border-t border-border pt-4">
+                  {showStatus && (
                   <div className="mb-3 text-xs text-muted-foreground">
                     {fb.status === 'archived' ? (
                       <span>Arquivada — fora da busca, mantida como histórico.</span>
@@ -106,13 +108,12 @@ export function MemoryDetail({ memoryId, onClose, getMemory, onVote, onForget, b
                       <span>
                         Confirmada{fb.last_confirmed_at ? ` em ${formatDateTime(fb.last_confirmed_at)}` : ''} — protegida do esquecimento.
                       </span>
-                    ) : (
-                      <span>Sem voto — vale o peso normal no ranking.</span>
-                    )}
+                    ) : null}
                     {fb.kind === 'state' && (
                       <span> Estado temporário: perde peso com o tempo.</span>
                     )}
                   </div>
+                  )}
                   <div className="flex flex-wrap items-center gap-2">
                     {onVote && (
                       <>
