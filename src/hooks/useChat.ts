@@ -22,10 +22,15 @@ export function useChat(model: string) {
   const [processing, setProcessing] = useState(false)
   const [sessionId, setSessionId] = useState(getSessionId)
   const eventSourceRef = useRef<EventSource | null>(null)
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const latestRequestedSessionRef = useRef<string | null>(getSessionId())
   const activeSessionRef = useRef<string>(getSessionId())
 
   const connectSSE = useCallback((sid: string) => {
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current)
+      reconnectTimeoutRef.current = null
+    }
     if (eventSourceRef.current) {
       eventSourceRef.current.close()
     }
@@ -85,7 +90,13 @@ export function useChat(model: string) {
 
     es.onerror = () => {
       es.close()
-      setTimeout(() => connectSSE(sid), 3000)
+      if (activeSessionRef.current !== sid) return
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current)
+      reconnectTimeoutRef.current = setTimeout(() => {
+        reconnectTimeoutRef.current = null
+        if (activeSessionRef.current !== sid) return
+        connectSSE(sid)
+      }, 3000)
     }
   }, [])
 
@@ -203,6 +214,7 @@ export function useChat(model: string) {
     connectSSE(sessionId)
     void loadMessages(sessionId)
     return () => {
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current)
       if (eventSourceRef.current) eventSourceRef.current.close()
     }
   }, [])
