@@ -1,6 +1,6 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useState, useEffect, useCallback } from 'react'
-import { motion, AnimatePresence } from 'motion/react'
+import { motion } from 'motion/react'
 import { useModel } from '@/hooks/useModel'
 import { useChat } from '@/hooks/useChat'
 import type { ChatMessage, Session } from '@/types'
@@ -170,7 +170,7 @@ export function Layout() {
             onClick={() => setHistoryCollapsed(true)}
             className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           >
-            <SidebarSimple className="size-4" />
+            <SidebarSimple className="size-4" weight="bold" />
           </button>
         )}
       </div>
@@ -250,15 +250,30 @@ export function Layout() {
         <div className="my-1 h-px w-6 bg-sidebar-border" />
 
         <IconRailLink to="/" label="Chat" active={location.pathname === '/'}>
-          <Chat className="size-5" />
+          <Chat className="size-5" weight="bold" />
         </IconRailLink>
         <IconRailLink
           to="/memorias"
           label="Memórias"
           active={location.pathname === '/memorias'}
         >
-          <BookOpen className="size-5" />
+          <BookOpen className="size-5" weight="bold" />
         </IconRailLink>
+        {historyCollapsed && (
+          <IconRailButton
+            label="Expandir histórico"
+            onClick={() => {
+              if (!isChatRoute) {
+                setHistoryCollapsed(false)
+                navigate('/')
+                return
+              }
+              setHistoryCollapsed(false)
+            }}
+          >
+            <SidebarSimple className="size-5" weight="bold" />
+          </IconRailButton>
+        )}
 
         <div className="flex-1" />
 
@@ -267,7 +282,7 @@ export function Layout() {
           label="Configurações"
           active={location.pathname === '/settings'}
         >
-          <Gear className="size-5" />
+          <Gear className="size-5" weight="bold" />
         </IconRailLink>
       </nav>
 
@@ -294,27 +309,7 @@ export function Layout() {
       )}
 
       {/* Conteúdo */}
-      <div className="relative flex min-h-0 flex-1 flex-col">
-        <AnimatePresence>
-          {isChatRoute && historyCollapsed && (
-            <motion.button
-              key="expand-history"
-              type="button"
-              title="Expandir histórico"
-              aria-label="Expandir histórico"
-              onClick={() => setHistoryCollapsed(false)}
-              initial={{ opacity: 0, x: -12, scale: 0.96 }}
-              animate={{ opacity: 1, x: 0, scale: 1 }}
-              exit={{ opacity: 0, x: -12, scale: 0.96 }}
-              transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-              whileHover={{ x: 2 }}
-              whileTap={{ scale: 0.92 }}
-              className="absolute top-1/2 left-0 z-10 hidden -translate-y-1/2 rounded-r-xl border border-l-0 border-sidebar-border bg-sidebar/90 py-3 pr-1.5 pl-1 text-muted-foreground shadow-lg backdrop-blur hover:bg-sidebar-accent hover:text-sidebar-accent-foreground md:block"
-            >
-              <SidebarSimple className="size-4" />
-            </motion.button>
-          )}
-        </AnimatePresence>
+      <div className="flex min-h-0 flex-1 flex-col">
         <Outlet
           context={
             {
@@ -372,7 +367,7 @@ export function Layout() {
                   : 'text-muted-foreground hover:bg-sidebar-accent'
               )}
             >
-              <Chat className="size-5" />
+              <Chat className="size-5" weight="bold" />
             </Link>
             <Link
               to="/memorias"
@@ -385,7 +380,7 @@ export function Layout() {
                   : 'text-muted-foreground hover:bg-sidebar-accent'
               )}
             >
-              <BookOpen className="size-5" />
+              <BookOpen className="size-5" weight="bold" />
             </Link>
             <div className="flex-1" />
             <Link
@@ -399,7 +394,7 @@ export function Layout() {
                   : 'text-muted-foreground hover:bg-sidebar-accent'
               )}
             >
-              <Gear className="size-5" />
+              <Gear className="size-5" weight="bold" />
             </Link>
           </div>
           <div className="flex min-h-0 flex-1 flex-col bg-sidebar">
