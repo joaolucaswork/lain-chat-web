@@ -47,7 +47,7 @@ export function MemoryDetail({ memoryId, onClose, getMemory, onVote, onForget, b
 
   return (
     <Dialog open={!!memoryId} onOpenChange={() => onClose()}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto border-0 bg-zinc-950 text-zinc-100 data-[state=open]:animate-none data-[state=closed]:animate-none">
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-card text-card-foreground border-border data-[state=open]:animate-none data-[state=closed]:animate-none">
         <motion.div
           key={memoryId ?? 'empty'}
           initial={{ opacity: 0, y: 24, scale: 0.98 }}
@@ -77,20 +77,20 @@ export function MemoryDetail({ memoryId, onClose, getMemory, onVote, onForget, b
                 {data.preview?.slice(0, 70)}
               </DialogTitle>
             </DialogHeader>
-            <div className="text-xs text-zinc-400 mb-3">
+            <div className="text-xs text-muted-foreground mb-3">
               {formatDateTime(data.created)} · {data.project || ''}
             </div>
             {(data.tags || []).length > 0 && (
               <div className="flex flex-wrap gap-1 mb-4">
                 {(data.tags || []).map((t: string) => (
-                  <Badge key={t} variant="secondary" className="border-0 bg-zinc-800 text-xs text-zinc-300">
+                  <Badge key={t} variant="secondary" className="text-xs">
                     {t.replace(/^#/, '')}
                   </Badge>
                 ))}
               </div>
             )}
             <div
-              className="text-[16px] leading-[1.8] tracking-[0.015em] whitespace-pre-wrap text-zinc-200"
+              className="text-[16px] leading-[1.8] tracking-[0.015em] whitespace-pre-wrap"
               dangerouslySetInnerHTML={{
                 __html: linkify((data.body || '').trim()),
               }}
@@ -98,8 +98,8 @@ export function MemoryDetail({ memoryId, onClose, getMemory, onVote, onForget, b
             {(onVote || onForget) && (() => {
               const fb = feedbackOf(data)
               return (
-                <div className="mt-6 border-t border-zinc-800 pt-4">
-                  <div className="mb-3 text-xs text-zinc-400">
+                <div className="mt-6 border-t border-border pt-4">
+                  <div className="mb-3 text-xs text-muted-foreground">
                     {fb.status === 'archived' ? (
                       <span>Arquivada — fora da busca, mantida como histórico.</span>
                     ) : fb.confidence >= 1 ? (
@@ -124,8 +124,8 @@ export function MemoryDetail({ memoryId, onClose, getMemory, onVote, onForget, b
                             className={cn(
                               'inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm transition-colors disabled:opacity-50',
                               fb.confidence >= 1
-                                ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400'
-                                : 'border-zinc-800 text-zinc-300 hover:text-emerald-400 hover:border-emerald-500/50'
+                                ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                                : 'border-border text-muted-foreground hover:text-emerald-600 hover:border-emerald-500/50'
                             )}
                           >
                             <Check className="size-4" weight="bold" />
@@ -140,8 +140,8 @@ export function MemoryDetail({ memoryId, onClose, getMemory, onVote, onForget, b
                             className={cn(
                               'inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm transition-colors disabled:opacity-50',
                               fb.status === 'archived'
-                                ? 'border-amber-500/50 bg-amber-500/10 text-amber-400'
-                                : 'border-zinc-800 text-zinc-300 hover:text-amber-400 hover:border-amber-500/50'
+                                ? 'border-amber-500/50 bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                                : 'border-border text-muted-foreground hover:text-amber-600 hover:border-amber-500/50'
                             )}
                           >
                             <ClockCounterClockwise className="size-4" />
@@ -153,7 +153,7 @@ export function MemoryDetail({ memoryId, onClose, getMemory, onVote, onForget, b
                     {onForget && (
                       confirmingForget ? (
                         <span className="inline-flex items-center gap-2 rounded-md border border-destructive/50 px-3 py-1.5 text-sm">
-                          <span className="text-zinc-400">Apagar e não trazer de volta?</span>
+                          <span className="text-muted-foreground">Apagar e não trazer de volta?</span>
                           <button
                             type="button"
                             disabled={busy}
@@ -165,7 +165,7 @@ export function MemoryDetail({ memoryId, onClose, getMemory, onVote, onForget, b
                           <button
                             type="button"
                             onClick={() => setConfirmingForget(false)}
-                            className="text-zinc-400 hover:text-zinc-100"
+                            className="text-muted-foreground hover:text-foreground"
                           >
                             manter
                           </button>
@@ -176,7 +176,7 @@ export function MemoryDetail({ memoryId, onClose, getMemory, onVote, onForget, b
                             type="button"
                             disabled={busy}
                             onClick={() => setConfirmingForget(true)}
-                            className="inline-flex items-center gap-1.5 rounded-md border border-zinc-800 px-3 py-1.5 text-sm text-zinc-300 transition-colors hover:text-destructive hover:border-destructive/50 disabled:opacity-50"
+                            className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-destructive hover:border-destructive/50 disabled:opacity-50"
                           >
                             <X className="size-4" weight="bold" />
                             Esquecer
