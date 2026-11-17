@@ -8,6 +8,15 @@ type RawServerMessage = {
   content: string | null
 }
 
+/** Acrescenta texto à última bolha do assistente (ou abre uma nova). */
+function appendAssistantText(prev: ChatMessage[], text: string): ChatMessage[] {
+  const last = prev[prev.length - 1]
+  if (last && last.role === 'assistant') {
+    return [...prev.slice(0, -1), { role: 'assistant', content: last.content + text }]
+  }
+  return [...prev, { role: 'assistant', content: text }]
+}
+
 function getSessionId(): string {
   let id = sessionStorage.getItem(SESSION_ID_KEY)
   if (!id) {
@@ -55,25 +64,13 @@ export function useChat(model: string) {
 
     es.addEventListener('token', (e: MessageEvent) => {
       const data = JSON.parse(e.data)
-      setMessages((prev) => {
-        const last = prev[prev.length - 1]
-        if (last && last.role === 'assistant') {
-          return [...prev.slice(0, -1), { role: 'assistant', content: last.content + data.text }]
-        }
-        return [...prev, { role: 'assistant', content: data.text }]
-      })
+      setMessages((prev) => appendAssistantText(prev, data.text))
     })
 
     es.addEventListener('token_end', (e: MessageEvent) => {
       const data = JSON.parse(e.data)
       if (!data.text) return
-      setMessages((prev) => {
-        const last = prev[prev.length - 1]
-        if (last && last.role === 'assistant') {
-          return [...prev.slice(0, -1), { role: 'assistant', content: last.content + data.text }]
-        }
-        return [...prev, { role: 'assistant', content: data.text }]
-      })
+      setMessages((prev) => appendAssistantText(prev, data.text))
     })
 
     es.addEventListener('done', () => {
