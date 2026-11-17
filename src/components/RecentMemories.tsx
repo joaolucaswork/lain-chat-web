@@ -7,18 +7,17 @@ import { FreeMode } from 'swiper/modules'
 import 'swiper/css'
 import { MemoryDetail } from '@/components/MemoryDetail'
 import { UndoBar } from '@/components/UndoBar'
-import { useHomeMemories } from '@/hooks/useHomeMemories'
-import { useMemorySearch } from '@/hooks/useMemorySearch'
-import { useMemoryActions } from '@/hooks/useMemoryActions'
+import { useRecentMemories } from '@/hooks/useRecentMemories'
 import { readCollapsedHome, writeCollapsedHome } from '@/lib/homeMemories'
 import { RecentMemoriesHeader } from '@/components/recent/RecentMemoriesHeader'
 import { InitialSkeleton, SearchSkeleton } from '@/components/recent/RecentMemoriesSkeleton'
 import { MemoryCarouselCard } from '@/components/recent/MemoryCarouselCard'
 
 export function RecentMemories() {
-  const { memories, setMemories, allMemories, setAllMemories, loading, reload } = useHomeMemories()
-  const search = useMemorySearch({ allMemories, setAllMemories })
-  const actions = useMemoryActions({ setMemories, setAllMemories, reload })
+  const rec = useRecentMemories()
+  const { memories, allMemories, loading } = rec
+  const search = rec
+  const actions = rec
   const navigate = useNavigate()
 
   const [collapsed, setCollapsed] = useState<boolean>(() => readCollapsedHome())
