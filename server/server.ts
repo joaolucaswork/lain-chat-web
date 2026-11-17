@@ -234,7 +234,10 @@ const SECURITY_HEADERS: Record<string, string> = {
   'X-Frame-Options': 'DENY',
   'Referrer-Policy': 'no-referrer',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
-  'Content-Security-Policy': "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; worker-src 'self' blob:; connect-src 'self'; form-action 'self'",
+  // sha256-… = script inline de bootstrap do tema em index.html (evita FOUC).
+  // Se o conteúdo daquele <script> mudar, recalcular o hash e atualizar aqui,
+  // senão o CSP bloqueia o script e o tema volta ao claro no refresh.
+  'Content-Security-Policy': "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self' 'sha256-AspNRzsvPr2/WxXfZUY/UJBzuHslkTwELHOu3l/vk14='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; worker-src 'self' blob:; connect-src 'self'; form-action 'self'",
   'Strict-Transport-Security': 'max-age=31536000',
 };
 

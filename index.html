@@ -7,6 +7,9 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Lain</title>
+    <!-- Bootstrap do tema (sem FOUC). Se mudar este script, atualizar o hash
+         sha256 no CSP em server/server.ts, senão o CSP bloqueia e o tema
+         não se mantém no refresh. -->
     <script>
       try {
         var t = localStorage.getItem('lain-theme');
