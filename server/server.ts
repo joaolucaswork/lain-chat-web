@@ -51,7 +51,7 @@ for (const s of sessions.values()) {
   }
 }
 
-Bun.serve({
+const server = Bun.serve({
   hostname: BIND_ADDR,
   port: PORT,
   idleTimeout: 120, // SSE streams ficam abertos; keepalive a cada 10s
@@ -68,5 +68,21 @@ Bun.serve({
       ?? json({ error: `unknown route: ${path}` }, 404);
   },
 });
+
+// WHY: sem isso o pm2 restart manda SIGTERM e o Bun com SSE aberto
+// (idleTimeout 120s) demora a morrer — o próximo processo bate em
+// EADDRINUSE e o contador de restarts acumula (550+ em Nov/2026).
+let _shuttingDown = false;
+function shutdownGracefully(signal: string) {
+  if (_shuttingDown) return;
+  _shuttingDown = true;
+  try {
+    server.stop(true); // fecha o socket imediatamente, libera a porta
+  } finally {
+    process.exit(0);
+  }
+}
+process.on('SIGTERM', () => shutdownGracefully('SIGTERM'));
+process.on('SIGINT', () => shutdownGracefully('SIGINT'));
 
 console.log(`[lain-chat-bff] listening on http://${BIND_ADDR}:${PORT} (memory: ${MEMORY_URL}, llm: ${LLM_BASE})`);
