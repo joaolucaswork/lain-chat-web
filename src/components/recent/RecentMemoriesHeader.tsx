@@ -29,9 +29,9 @@ export function RecentMemoriesHeader({
 }: HeaderProps) {
   return (
     <div className="mb-3 flex items-center justify-between">
-      <div className="flex min-w-0 items-center gap-0.5">
-        <h2 className="shrink-0 overflow-hidden text-sm font-medium text-muted-foreground">
-          <AnimatePresence mode="wait" initial={false} custom={isSearching ? 1 : -1}>
+      <div className="flex h-8 min-w-0 items-center gap-0">
+        <h2 className="relative block h-5 min-w-[132px] shrink-0 overflow-hidden text-sm font-medium text-muted-foreground">
+          <AnimatePresence initial={false} custom={isSearching ? 1 : -1}>
             <motion.span
               key={titleMode}
               custom={isSearching ? 1 : -1}
@@ -43,7 +43,7 @@ export function RecentMemoriesHeader({
               initial="enter"
               animate="center"
               exit="exit"
-              className="inline-block whitespace-nowrap"
+              className="absolute top-0 left-0 inline-block whitespace-nowrap"
             >
               {titleLabel}
             </motion.span>
@@ -65,14 +65,16 @@ export function RecentMemoriesHeader({
             <CaretDown className="size-3.5" />
           </motion.span>
         </button>
-        {searchOpen ? (
-          <motion.div
-            key="mem-search"
-            initial={{ opacity: 0, width: 0 }}
-            animate={{ opacity: 1, width: 240 }}
-            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-            className="flex max-w-[46vw] items-center gap-1 overflow-hidden"
-          >
+        <AnimatePresence initial={false} mode="wait">
+          {searchOpen ? (
+            <motion.div
+              key="mem-search"
+              initial={{ opacity: 0, width: 0 }}
+              animate={{ opacity: 1, width: 240 }}
+              exit={{ opacity: 0, width: 0, transition: { duration: 0.2, ease: [0.4, 0, 0.2, 1] } }}
+              transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+              className="flex h-8 max-w-[46vw] shrink-0 items-center gap-1 overflow-hidden"
+            >
             <div className="relative w-full">
               <MagnifyingGlass className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
               <input
@@ -83,7 +85,7 @@ export function RecentMemoriesHeader({
                   if (e.key === 'Escape') onCloseSearch()
                 }}
                 placeholder="Buscar memórias..."
-                className="h-8 w-full rounded-md border border-border bg-background pr-3 pl-7 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none"
+                className="h-8 w-full rounded-3xl border border-border bg-muted pr-3 pl-7 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none dark:bg-input/30"
               />
             </div>
             <button
@@ -96,16 +98,21 @@ export function RecentMemoriesHeader({
             </button>
           </motion.div>
         ) : (
-          <button
+          <motion.button
+            key="mem-search-btn"
             type="button"
             aria-label="Buscar memórias"
             title="Buscar memórias"
             onClick={onOpenSearch}
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1, transition: { duration: 0.18, ease: [0.22, 1, 0.36, 1] } }}
+            exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.15, ease: [0.4, 0, 0.2, 1] } }}
             className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
             <MagnifyingGlass className="size-3.5" />
-          </button>
+          </motion.button>
         )}
+        </AnimatePresence>
       </div>
       <div className="flex items-center gap-1.5">
         <AnimatePresence initial={false}>

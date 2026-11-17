@@ -193,7 +193,6 @@ export function RecentMemories() {
               ) : (
                 <>
                   <Swiper
-                    key={searchOpen ? 'search' : 'recent'}
                     modules={[FreeMode]}
                     slidesPerView="auto"
                     spaceBetween={12}

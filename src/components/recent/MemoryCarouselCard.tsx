@@ -22,7 +22,7 @@ export function MemoryCarouselCard({
 }: CardProps) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
+      initial={staggerDelay > 0 ? { opacity: 0, y: 8 } : false}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: false, amount: 0.3 }}
       transition={{ duration: 0.35, delay: staggerDelay, ease: [0.22, 1, 0.36, 1] }}
