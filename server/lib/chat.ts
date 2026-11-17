@@ -10,12 +10,13 @@ import { broadcast } from './sse.ts';
 import { buildMemoryBlock, getSaoPauloToday, queryGraph, recallMemories, rememberTurn } from './memory.ts';
 import { MEM_TOOLS, callLlmStreamWithRetry, execLlmTool } from './llm.ts';
 import { maybeGenerateTitle } from './titles.ts';
-import { persistSession } from './sessions.ts';
+import { persistSession, sessionKey, streamKey } from './sessions.ts';
 
-export async function processMessage(session: Session, userMessage: string, signal?: AbortSignal): Promise<void> {
+export async function processMessage(session: Session, userMessage: string, signal?: AbortSignal, memKey?: string): Promise<void> {
   // 1. Hybrid paralelo: recall (vetor) + grafo. Grafo é best-effort, nunca bloqueia.
-  const [hits, graphMd] = await Promise.all([recallMemories(userMessage), queryGraph(userMessage)]);
+  const [hits, graphMd] = await Promise.all([recallMemories(userMessage, memKey), queryGraph(userMessage, memKey)]);
   if (signal?.aborted) return;
+  const stream = streamKey(session);
   const memBlock = buildMemoryBlock(hits, graphMd);
   const byScope = new Map<string, number>();
   for (const h of hits) byScope.set(h.project ?? '?', (byScope.get(h.project ?? '?') ?? 0) + 1);
@@ -40,7 +41,7 @@ export async function processMessage(session: Session, userMessage: string, sign
   for (let turn = 0; turn < 3; turn++) {
     const { content, toolCalls } = await callLlmStreamWithRetry(apiMessages, session.model, MEM_TOOLS, (token) => {
       streamed = true;
-      broadcast(session.id, 'token', { text: token });
+      broadcast(stream, 'token', { text: token });
     }, signal);
     if (toolCalls.length === 0) { finalText = content; break; }
     finalText = content; // normalmente vazio quando há tool calls
@@ -50,25 +51,25 @@ export async function processMessage(session: Session, userMessage: string, sign
     });
     for (const tc of toolCalls) {
       if (signal?.aborted) throw new Error('STOPPED');
-      const result = await execLlmTool(tc);
+      const result = await execLlmTool(tc, memKey);
       apiMessages.push({ role: 'tool', tool_call_id: tc.id, content: result });
     }
   }
 
   // 4. Persiste só o texto final + finaliza (protocolo do frontend: token_end fecha o balão)
   if (!finalText.trim()) {
-    broadcast(session.id, 'server_error', { message: 'O modelo esgotou as tentativas sem responder. Tente reformular a pergunta.' });
-    broadcast(session.id, 'done', {});
+    broadcast(stream, 'server_error', { message: 'O modelo esgotou as tentativas sem responder. Tente reformular a pergunta.' });
+    broadcast(stream, 'done', {});
     return; // sem remember de resposta vazia
   }
   session.messages.push({ role: 'assistant', content: finalText });
   persistSession(session);
   maybeGenerateTitle(session);
-  broadcast(session.id, 'token_end', { text: streamed ? '' : finalText });
-  broadcast(session.id, 'done', {});
+  broadcast(stream, 'token_end', { text: streamed ? '' : finalText });
+  broadcast(stream, 'done', {});
 
   // 5. Remember em background
-  rememberTurn(userMessage, finalText);
+  rememberTurn(userMessage, finalText, memKey);
 }
 
 /** Erro técnico → mensagem amigável para a UI. */
@@ -84,18 +85,19 @@ export function friendlyChatError(err: unknown): string {
 }
 
 /** Lifecycle de um turno: processing_start → processMessage → erro/done. */
-export function runTurn(sessionId: string, session: Session, userMessage: string): void {
-  broadcast(sessionId, 'processing_start', { model: session.model });
+export function runTurn(sessionId: string, session: Session, userMessage: string, memKey?: string): void {
+  const stream = streamKey(session);
+  broadcast(stream, 'processing_start', { model: session.model });
   const abortCtrl = new AbortController();
-  abortCtrls.set(sessionId, abortCtrl);
-  processMessage(session, userMessage, abortCtrl.signal).catch(err => {
+  abortCtrls.set(sessionKey(session.owner, sessionId), abortCtrl);
+  processMessage(session, userMessage, abortCtrl.signal, memKey).catch(err => {
     if (err instanceof Error && (err.message === 'STOPPED' || abortCtrl.signal.aborted)) {
-      broadcast(sessionId, 'token_end', { text: '' });
+      broadcast(stream, 'token_end', { text: '' });
     } else {
       const raw = err instanceof Error ? err.message : String(err);
       console.error(`[bff] chat failed (session=${sessionId}):`, raw);
-      broadcast(sessionId, 'server_error', { message: friendlyChatError(err) });
+      broadcast(stream, 'server_error', { message: friendlyChatError(err) });
     }
-    broadcast(sessionId, 'done', {});
-  }).finally(() => abortCtrls.delete(sessionId));
+    broadcast(stream, 'done', {});
+  }).finally(() => abortCtrls.delete(sessionKey(session.owner, sessionId)));
 }

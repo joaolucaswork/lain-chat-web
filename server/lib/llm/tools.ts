@@ -76,41 +76,41 @@ function parseToolArgs(raw: string): Record<string, any> {
   }
 }
 
-async function fanoutScopes(): Promise<Array<string | undefined>> {
-  const { includeGlobal, projects } = await getChatScopes();
+async function fanoutScopes(key?: string): Promise<Array<string | undefined>> {
+  const { includeGlobal, projects } = await getChatScopes(key);
   const scopes: Array<string | undefined> = [...(includeGlobal ? [undefined] : []), ...projects];
   if (scopes.length === 0) scopes.push(CHAT_PROJECT || undefined);
   return scopes;
 }
 
-async function execListMemories(args: Record<string, any>): Promise<string> {
+async function execListMemories(args: Record<string, any>, key?: string): Promise<string> {
   const limit = typeof args.limit === 'number' ? clamp(args.limit, 1, 50) : 20;
   const onlyScope = typeof args.project === 'string' && args.project.trim() ? args.project.trim() : undefined;
   try {
-    if (onlyScope) return await listSingleScope(onlyScope, limit);
-    return await listAllScopes(limit);
+    if (onlyScope) return await listSingleScope(onlyScope, limit, key);
+    return await listAllScopes(limit, key);
   } catch {
     return 'Memória indisponível no momento.';
   }
 }
 
-async function listSingleScope(scope: string, limit: number): Promise<string> {
+async function listSingleScope(scope: string, limit: number, key?: string): Promise<string> {
   const isGlobal = scope.toLowerCase() === 'global';
   const data = await fetchJson(`${MEMORY_URL}/api/memory/list`,
-    isGlobal ? { limit } : { project: scope, limit }, 10_000);
+    isGlobal ? { limit } : { project: scope, limit }, 10_000, key);
   const items = Array.isArray(data) ? data : [];
   if (items.length === 0) return 'Nenhuma memória salva.';
   items.sort((a: any, b: any) => String(b.created_at ?? '').localeCompare(String(a.created_at ?? '')));
   return items.slice(0, limit).map((m: any, i: number) => fmtHit(m, i, isGlobal ? 'global' : scope)).join('\n').slice(0, 6000);
 }
 
-async function listAllScopes(limit: number): Promise<string> {
-  const scopes = await fanoutScopes();
+async function listAllScopes(limit: number, key?: string): Promise<string> {
+  const scopes = await fanoutScopes(key);
   const perScope = clamp(Math.ceil(limit / Math.max(scopes.length, 1)), 5, 50);
   const batches = await Promise.all(scopes.map(async (scope) => {
     try {
       const data = await fetchJson(`${MEMORY_URL}/api/memory/list`,
-        scope ? { project: scope, limit: perScope } : { limit: perScope }, 10_000);
+        scope ? { project: scope, limit: perScope } : { limit: perScope }, 10_000, key);
       return { scope: scope ?? 'global', items: Array.isArray(data) ? data : [] };
     } catch { return { scope: scope ?? 'global', items: [] as any[] }; }
   }));
@@ -129,34 +129,34 @@ async function listAllScopes(limit: number): Promise<string> {
   return all.slice(0, limit).map(({ m, scope }, i) => fmtHit(m, i, scope)).join('\n').slice(0, 6000);
 }
 
-async function execSearchMemories(args: Record<string, any>): Promise<string> {
+async function execSearchMemories(args: Record<string, any>, key?: string): Promise<string> {
   const q = typeof args.query === 'string' ? args.query : '';
   const limit = typeof args.limit === 'number' ? clamp(args.limit, 1, 15) : 8;
   const onlyScope = typeof args.project === 'string' && args.project.trim() ? args.project.trim() : undefined;
   if (!q.trim()) return 'Informe as keywords para buscar nas memórias.';
   try {
-    if (onlyScope) return await searchSingleScope(onlyScope, q, limit);
-    return await searchAllScopes(q, limit);
+    if (onlyScope) return await searchSingleScope(onlyScope, q, limit, key);
+    return await searchAllScopes(q, limit, key);
   } catch {
     return 'Memória indisponível no momento.';
   }
 }
 
-async function searchSingleScope(scope: string, q: string, limit: number): Promise<string> {
+async function searchSingleScope(scope: string, q: string, limit: number, key?: string): Promise<string> {
   const isGlobal = scope.toLowerCase() === 'global';
   const data = await fetchJson(`${MEMORY_URL}/api/memory/recall`,
-    isGlobal ? { query: q, limit } : { query: q, project: scope, limit }, 10_000);
+    isGlobal ? { query: q, limit } : { query: q, project: scope, limit }, 10_000, key);
   const items = Array.isArray(data) ? data : [];
   if (items.length === 0) return 'Nenhuma memória encontrada para essa busca.';
   return items.slice(0, limit).map((m: any, i: number) => fmtHit(m, i, isGlobal ? 'global' : scope)).join('\n').slice(0, 4000);
 }
 
-async function searchAllScopes(q: string, limit: number): Promise<string> {
-  const scopes = await fanoutScopes();
+async function searchAllScopes(q: string, limit: number, key?: string): Promise<string> {
+  const scopes = await fanoutScopes(key);
   const batches = await Promise.all(scopes.map(async (scope) => {
     try {
       const data = await fetchJson(`${MEMORY_URL}/api/memory/recall`,
-        scope ? { query: q, project: scope, limit } : { query: q, limit }, 10_000);
+        scope ? { query: q, project: scope, limit } : { query: q, limit }, 10_000, key);
       return { scope: scope ?? 'global', items: Array.isArray(data) ? data : [] };
     } catch { return { scope: scope ?? 'global', items: [] as any[] }; }
   }));
@@ -173,15 +173,15 @@ async function searchAllScopes(q: string, limit: number): Promise<string> {
   return items.map(({ m, scope }, i) => fmtHit(m, i, scope)).join('\n').slice(0, 4000);
 }
 
-async function execGraphStats(): Promise<string> {
+async function execGraphStats(key?: string): Promise<string> {
   try {
-    const res = await fetch(`${MEMORY_URL}/api/graph/stats`, { headers: memGetHeaders(), signal: AbortSignal.timeout(10_000) });
+    const res = await fetch(`${MEMORY_URL}/api/graph/stats`, { headers: memGetHeaders(key), signal: AbortSignal.timeout(10_000) });
     if (!res.ok) throw new Error(`graph/stats → ${res.status}`);
     const s = await res.json() as { nodes: number; edges: number; types: Record<string, number> };
     const types = Object.entries(s.types || {}).map(([t, n]) => `${t} (${n})`).join(', ');
     let out = `Grafo: ${s.nodes} entidades, ${s.edges} relacionamentos.${types ? ` Tipos: ${types}.` : ''}`;
     try {
-      const rn = await fetch(`${MEMORY_URL}/api/graph/nodes`, { headers: memGetHeaders(), signal: AbortSignal.timeout(10_000) });
+      const rn = await fetch(`${MEMORY_URL}/api/graph/nodes`, { headers: memGetHeaders(key), signal: AbortSignal.timeout(10_000) });
       if (rn.ok) out += await appendNodeNames(rn);
     } catch { /* stats sem nomes ainda vale */ }
     return out;
@@ -203,23 +203,23 @@ async function appendNodeNames(rn: Response): Promise<string> {
   return `\nEntidades: ${parts.join(' | ')}`.slice(0, 2500);
 }
 
-async function execGraphQuery(args: Record<string, any>): Promise<string> {
+async function execGraphQuery(args: Record<string, any>, key?: string): Promise<string> {
   const q = typeof args.query === 'string' ? args.query : '';
   if (!q.trim()) return 'Informe o tema ou entidade a buscar no grafo.';
   try {
-    const data = await fetchJson(`${MEMORY_URL}/api/graph/query`, { query: q, depth: 2, maxNodes: 10 }, 10_000);
+    const data = await fetchJson(`${MEMORY_URL}/api/graph/query`, { query: q, depth: 2, maxNodes: 10 }, 10_000, key);
     const md = typeof data?.markdown === 'string' ? data.markdown : '';
     if (md.trim()) return md.slice(0, 3000);
   } catch {
     return 'Grafo indisponível no momento.';
   }
-  return await fallbackGraphSubstring(q);
+  return await fallbackGraphSubstring(q, key);
 }
 
-async function fallbackGraphSubstring(q: string): Promise<string> {
+async function fallbackGraphSubstring(q: string, key?: string): Promise<string> {
   // Busca direta é lexical e pode falhar — lista entidades que casam por substring.
   try {
-    const rn = await fetch(`${MEMORY_URL}/api/graph/nodes`, { headers: memGetHeaders(), signal: AbortSignal.timeout(10_000) });
+    const rn = await fetch(`${MEMORY_URL}/api/graph/nodes`, { headers: memGetHeaders(key), signal: AbortSignal.timeout(10_000) });
     if (!rn.ok) return 'Nenhuma entidade relacionada encontrada no grafo.';
     const nodes = (await rn.json()) as Array<{ id: string; type: string }>;
     const words = q.toLowerCase().split(/\s+/).filter(w => w.length >= 4);
@@ -233,11 +233,11 @@ async function fallbackGraphSubstring(q: string): Promise<string> {
 }
 
 /** Executa tools do LLM contra o lain-memory. Roda silencioso (sem eventos na UI). */
-export async function execLlmTool(tc: LlmToolCall): Promise<string> {
+export async function execLlmTool(tc: LlmToolCall, key?: string): Promise<string> {
   const args = parseToolArgs(tc.args);
-  if (tc.name === 'list_memories') return execListMemories(args);
-  if (tc.name === 'search_memories') return execSearchMemories(args);
-  if (tc.name === 'graph_stats') return execGraphStats();
-  if (tc.name === 'graph_query') return execGraphQuery(args);
+  if (tc.name === 'list_memories') return execListMemories(args, key);
+  if (tc.name === 'search_memories') return execSearchMemories(args, key);
+  if (tc.name === 'graph_stats') return execGraphStats(key);
+  if (tc.name === 'graph_query') return execGraphQuery(args, key);
   return `Error: unknown tool "${tc.name}"`;
 }

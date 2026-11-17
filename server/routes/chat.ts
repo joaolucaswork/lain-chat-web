@@ -1,20 +1,27 @@
-/** Rotas de chat: SSE, envio, retry, stop, histórico e clear. */
+/** Rotas de chat: SSE, envio, retry, stop, histórico e clear. Sessões isoladas por dono. */
 import { randomUUID } from 'node:crypto';
-import { abortCtrls, getSession, persistSession, sessions } from '../lib/sessions.ts';
+import { abortCtrls, findSession, getSession, persistSession, sessionKey, streamKey } from '../lib/sessions.ts';
 import { addSseClient, broadcast, removeSseClient } from '../lib/sse.ts';
 import { json, sseMsg, withSecurityHeaders } from '../lib/http.ts';
+import { effectiveModel, memoryKeyForRequest, ownerForRequest } from '../lib/tenant.ts';
 import { runTurn } from '../lib/chat.ts';
 
 export async function handleChat(req: Request, path: string, params: URLSearchParams): Promise<Response | null> {
+  const owner = ownerForRequest(req);
+  const memKey = memoryKeyForRequest(req);
+
   // ── SSE ──
   if (req.method === 'GET' && path === '/api/chat') {
     const sessionId = params.get('sessionId') || randomUUID();
-    getSession(sessionId);
+    // Auto-cria em memória (sem persistir — arquivo só na primeira mensagem).
+    // Sem risco entre donos: a sessão nasce no diretório DESTE dono.
+    const existing = getSession(sessionId, owner);
+    const stream = streamKey(existing);
     let ctrl!: ReadableStreamDefaultController<string>;
-    const stream = new ReadableStream<string>({
+    const s = new ReadableStream<string>({
       start(c) {
         ctrl = c;
-        addSseClient(sessionId, c);
+        addSseClient(stream, c);
         c.enqueue(sseMsg('connected', { sessionId }));
         const keepalive = setInterval(() => {
           try { c.enqueue(sseMsg('ping', {})); } catch { clearInterval(keepalive); }
@@ -22,11 +29,11 @@ export async function handleChat(req: Request, path: string, params: URLSearchPa
         (c as any)._keepalive = keepalive;
       },
       cancel() {
-        removeSseClient(sessionId, ctrl);
+        removeSseClient(stream, ctrl);
         clearInterval((ctrl as any)._keepalive);
       },
     });
-    return withSecurityHeaders(new Response(stream, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' } }));
+    return withSecurityHeaders(new Response(s, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' } }));
   }
 
   // ── Send message ──
@@ -37,13 +44,13 @@ export async function handleChat(req: Request, path: string, params: URLSearchPa
     const message = ((body.message || '') as string).trim();
     if (!message) return json({ error: 'Message is required' }, 400);
 
-    const session = getSession(sessionId);
-    if (typeof body.model === 'string' && body.model) session.model = body.model;
+    const session = getSession(sessionId, owner);
+    session.model = effectiveModel(body.model, req);
 
     session.messages.push({ role: 'user', content: message });
     persistSession(session);
-    broadcast(sessionId, 'user_message', { text: message });
-    runTurn(sessionId, session, message);
+    broadcast(streamKey(session), 'user_message', { text: message });
+    runTurn(sessionId, session, message, memKey);
 
     return json({ sessionId });
   }
@@ -55,12 +62,13 @@ export async function handleChat(req: Request, path: string, params: URLSearchPa
   if (req.method === 'POST' && path === '/api/chat/retry') {
     const sessionId = params.get('sessionId');
     if (!sessionId) return json({ error: 'sessionId required' }, 400);
-    const session = sessions.get(sessionId);
+    const session = findSession(sessionId, owner);
     if (!session) return json({ error: 'session not found' }, 404);
-    if (abortCtrls.has(sessionId)) return json({ error: 'already processing' }, 409);
+    const abortKey = sessionKey(owner, sessionId);
+    if (abortCtrls.has(abortKey)) return json({ error: 'already processing' }, 409);
     let body: Record<string, unknown> = {};
     try { body = await req.json(); } catch { /* corpo opcional (só model) */ }
-    if (typeof body.model === 'string' && body.model) session.model = body.model;
+    session.model = effectiveModel(body.model ?? session.model, req);
     // Última mensagem do usuário no histórico persistido
     let lastUser = -1;
     for (let i = session.messages.length - 1; i >= 0; i--) {
@@ -74,7 +82,7 @@ export async function handleChat(req: Request, path: string, params: URLSearchPa
       session.messages = session.messages.slice(0, lastUser + 1);
       persistSession(session);
     }
-    runTurn(sessionId, session, session.messages[lastUser].content as string);
+    runTurn(sessionId, session, session.messages[lastUser].content as string, memKey);
     return json({ sessionId, retried: true });
   }
 
@@ -82,8 +90,9 @@ export async function handleChat(req: Request, path: string, params: URLSearchPa
   if (req.method === 'POST' && path === '/api/chat/stop') {
     const sessionId = params.get('sessionId');
     if (!sessionId) return json({ error: 'sessionId required' }, 400);
-    abortCtrls.get(sessionId)?.abort();
-    abortCtrls.delete(sessionId);
+    const abortKey = sessionKey(owner, sessionId);
+    abortCtrls.get(abortKey)?.abort();
+    abortCtrls.delete(abortKey);
     return json({ ok: true });
   }
 
@@ -91,7 +100,8 @@ export async function handleChat(req: Request, path: string, params: URLSearchPa
   if (req.method === 'GET' && path === '/api/history') {
     const sessionId = params.get('sessionId');
     if (!sessionId) return json({ error: 'sessionId required' }, 400);
-    const s = getSession(sessionId);
+    const s = findSession(sessionId, owner);
+    if (!s) return json({ error: 'session not found' }, 404);
     return json({ messages: s.messages });
   }
 
@@ -102,7 +112,7 @@ export async function handleChat(req: Request, path: string, params: URLSearchPa
   if (req.method === 'POST' && path === '/api/clear') {
     const sessionId = params.get('sessionId');
     if (sessionId) {
-      const s = sessions.get(sessionId);
+      const s = findSession(sessionId, owner);
       if (s) {
         s.messages = [s.messages[0]];
         persistSession(s);

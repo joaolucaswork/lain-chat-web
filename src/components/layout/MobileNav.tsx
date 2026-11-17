@@ -2,6 +2,8 @@ import type { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { ChatTeardrop, Brain, Gear, Plus } from '@phosphor-icons/react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { TenantExitButton } from '@/components/TenantExitButton'
+import { useMeMode } from '@/hooks/useMe'
 import { cn } from '@/lib/utils'
 
 interface MobileNavProps {
@@ -14,6 +16,7 @@ interface MobileNavProps {
 /** Drawer mobile: navegação + histórico em largura total. */
 export function MobileNav({ open, onOpenChange, onNewChat, panel }: MobileNavProps) {
   const location = useLocation()
+  const meMode = useMeMode()
   const close = () => onOpenChange(false)
 
   return (
@@ -48,7 +51,13 @@ export function MobileNav({ open, onOpenChange, onNewChat, panel }: MobileNavPro
         >
           <MobileLink to="/" label="Chat" icon="chat" active={location.pathname === '/'} onClick={close} />
           <MobileLink to="/memorias" label="Memórias" icon="brain" active={location.pathname === '/memorias'} onClick={close} />
-          <MobileLink to="/settings" label="Ajustes" icon="gear" active={location.pathname === '/settings'} onClick={close} />
+          {meMode === 'tenant' ? (
+            <div className="flex min-w-0 flex-1" onClick={close}>
+              <TenantExitButton />
+            </div>
+          ) : (
+            <MobileLink to="/settings" label="Ajustes" icon="gear" active={location.pathname === '/settings'} onClick={close} />
+          )}
         </nav>
         <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-sidebar dark:bg-[#111113]">
           {panel}

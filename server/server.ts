@@ -31,6 +31,7 @@ import { handleChat } from './routes/chat.ts';
 import { handleSessions } from './routes/sessions.ts';
 import { handleVault } from './routes/vault.ts';
 import { handleSettings } from './routes/settings.ts';
+import { handleTenant } from './routes/tenant.ts';
 
 loadSessionsFromDisk();
 
@@ -65,6 +66,7 @@ const server = Bun.serve({
       ?? (await handleSessions(req, path, params))
       ?? (await handleVault(req, path))
       ?? (await handleSettings(req, path))
+      ?? (await handleTenant(req, path))
       ?? json({ error: `unknown route: ${path}` }, 404);
   },
 });

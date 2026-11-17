@@ -1,13 +1,15 @@
-/** Rotas do vault: memórias e grafo via lain-memory (proxy + formato da UI). */
+/** Rotas do vault: memórias e grafo via lain-memory (proxy + formato da UI). Key por request. */
 import { MEMORY_URL } from '../config.ts';
 import { json } from '../lib/http.ts';
 import { fetchJson, listVaultMemories, memGetHeaders } from '../lib/memory.ts';
+import { memoryKeyForRequest } from '../lib/tenant.ts';
 
 export async function handleVault(req: Request, path: string): Promise<Response | null> {
+  const key = memoryKeyForRequest(req);
   // ── Vault: memórias (via lain-memory) ──
   if (req.method === 'GET' && path === '/api/vault/memories') {
     try {
-      return json(await listVaultMemories());
+      return json(await listVaultMemories(key));
     } catch {
       return json({ error: 'lain-memory unavailable' }, 502);
     }
@@ -16,11 +18,11 @@ export async function handleVault(req: Request, path: string): Promise<Response 
   if (req.method === 'GET' && path.startsWith('/api/vault/memory/')) {
     const id = decodeURIComponent(path.slice('/api/vault/memory/'.length));
     try {
-      const all = await listVaultMemories();
+      const all = await listVaultMemories(key);
       const found = all.find(m => m.id === id);
       if (!found) return json({ error: 'not found' }, 404);
       const scope = found.project === 'global' ? {} : { project: found.project };
-      const full = await fetchJson(`${MEMORY_URL}/api/memory/list`, { ...scope, limit: 500 })
+      const full = await fetchJson(`${MEMORY_URL}/api/memory/list`, { ...scope, limit: 500 }, 5000, key)
         .then((d: any[]) => (Array.isArray(d) ? d : []).find((m: any) => m.id === id))
         .catch(() => null);
       const { ...rest } = found;
@@ -41,14 +43,14 @@ export async function handleVault(req: Request, path: string): Promise<Response 
     }
     const kind = body.kind === 'state' || body.kind === 'fact' ? body.kind : undefined;
     try {
-      const found = (await listVaultMemories()).find(m => m.id === id);
+      const found = (await listVaultMemories(key)).find(m => m.id === id);
       if (!found) return json({ error: 'not found' }, 404);
       const fb = await fetchJson(`${MEMORY_URL}/api/memory/feedback`, {
         id,
         project: found.project || 'global',
         action,
         ...(kind ? { kind } : {}),
-      }, 10_000);
+      }, 10_000, key);
       return json(fb);
     } catch {
       return json({ error: 'lain-memory unavailable' }, 502);
@@ -59,13 +61,13 @@ export async function handleVault(req: Request, path: string): Promise<Response 
   if (req.method === 'DELETE' && path.startsWith('/api/vault/memory/')) {
     const id = decodeURIComponent(path.slice('/api/vault/memory/'.length));
     try {
-      const all = await listVaultMemories();
+      const all = await listVaultMemories(key);
       const found = all.find(m => m.id === id);
       if (!found) return json({ error: 'not found' }, 404);
       const res = await fetchJson(`${MEMORY_URL}/api/memory/forget`, {
         memory_id: id,
         project: found.project || 'global',
-      }, 10_000);
+      }, 10_000, key);
       return json(res);
     } catch {
       return json({ error: 'lain-memory unavailable' }, 502);
@@ -84,7 +86,7 @@ export async function handleVault(req: Request, path: string): Promise<Response 
       const res = await fetchJson(`${MEMORY_URL}/api/memory/restore`, {
         memory_id: body.trash_id,
         ...(project ? { project } : {}),
-      }, 10_000);
+      }, 10_000, key);
       return json(res);
     } catch {
       return json({ error: 'lain-memory unavailable' }, 502);
@@ -94,7 +96,7 @@ export async function handleVault(req: Request, path: string): Promise<Response 
   // ── Vault: grafo (via lain-memory) ──
   if (req.method === 'GET' && path === '/api/vault/graph') {
     try {
-      const res = await fetch(`${MEMORY_URL}/api/graph/nodes`, { headers: memGetHeaders(), signal: AbortSignal.timeout(5000) });
+      const res = await fetch(`${MEMORY_URL}/api/graph/nodes`, { headers: memGetHeaders(key), signal: AbortSignal.timeout(5000) });
       if (!res.ok) throw new Error(`graph/nodes → ${res.status}`);
       const nodes = (await res.json()) as Array<{ id: string; type: string; mentions: number; edgeCount: number }>;
       return json(nodes.map(n => ({ key: n.id, type: n.type, file: `graph:${n.id}` })));
@@ -104,12 +106,12 @@ export async function handleVault(req: Request, path: string): Promise<Response 
   }
 
   if (req.method === 'GET' && path.startsWith('/api/vault/graph/')) {
-    const key = decodeURIComponent(path.slice('/api/vault/graph/'.length));
+    const kid = decodeURIComponent(path.slice('/api/vault/graph/'.length));
     try {
-      const res = await fetch(`${MEMORY_URL}/api/graph/nodes`, { headers: memGetHeaders(), signal: AbortSignal.timeout(5000) });
+      const res = await fetch(`${MEMORY_URL}/api/graph/nodes`, { headers: memGetHeaders(key), signal: AbortSignal.timeout(5000) });
       if (!res.ok) throw new Error(`graph/nodes → ${res.status}`);
       const nodes = (await res.json()) as Array<{ id: string; type: string; mentions: number; edgeCount: number }>;
-      const n = nodes.find(x => x.id === key);
+      const n = nodes.find(x => x.id === kid);
       if (!n) return json({ error: 'not found' }, 404);
       return json({ key: n.id, type: n.type, file: `graph:${n.id}`, body: `Tipo: ${n.type}\nMenções: ${n.mentions}\nArestas: ${n.edgeCount}` });
     } catch {

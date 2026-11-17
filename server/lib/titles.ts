@@ -1,6 +1,6 @@
 /** Títulos de sessão gerados via LLM a partir dos primeiros turnos. */
 import { DEFAULT_MODEL, LLM_BASE, getLlmKey } from '../config.ts';
-import { persistSession, sessions } from './sessions.ts';
+import { findSession, persistSession, sessionKey } from './sessions.ts';
 import type { Session } from './sessions.ts';
 
 const titleGenInFlight = new Set<string>();
@@ -14,12 +14,13 @@ export function sanitizeTitle(raw: string): string {
 
 /** Gera título curto via LLM a partir dos primeiros turnos (user+assistant). Fire-and-forget. */
 export function maybeGenerateTitle(session: Session): void {
-  if (session.title || titleGenInFlight.has(session.id)) return;
+  const key = sessionKey(session.owner, session.id);
+  if (session.title || titleGenInFlight.has(key)) return;
   const convo = session.messages.filter(m => m.role !== 'system' && m.content?.trim()).slice(0, 4);
   if (convo.length < 2) return; // precisa de ao menos 1 ida + 1 volta
   const llmKey = getLlmKey();
   if (!llmKey) return;
-  titleGenInFlight.add(session.id);
+  titleGenInFlight.add(key);
   const buildExcerpt = (n: number, chars: number) =>
     convo
       .slice(0, n)
@@ -67,14 +68,14 @@ export function maybeGenerateTitle(session: Session): void {
         console.error(`[bff] title gen empty (${session.id.slice(0, 8)}) após retry`);
         return;
       }
-      const current = sessions.get(session.id);
+      const current = findSession(session.id, session.owner);
       if (!current || current.title) return;
       current.title = title;
       persistSession(current);
     } catch (err) {
       console.error(`[bff] title gen failed (${session.id.slice(0, 8)}):`, err instanceof Error ? err.message : err);
     } finally {
-      titleGenInFlight.delete(session.id);
+      titleGenInFlight.delete(sessionKey(session.owner, session.id));
     }
   })();
 }

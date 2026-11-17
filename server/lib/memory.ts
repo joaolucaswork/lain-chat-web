@@ -21,16 +21,17 @@ export interface MemoryHit {
   project?: string;
 }
 
-export function memGetHeaders(): Record<string, string> {
-  return { ...(MEMORY_KEY ? { Authorization: `Bearer ${MEMORY_KEY}` } : {}) };
+export function memGetHeaders(key?: string): Record<string, string> {
+  const k = key ?? MEMORY_KEY;
+  return { ...(k ? { Authorization: `Bearer ${k}` } : {}) };
 }
 
-export async function fetchJson(url: string, body: unknown, timeoutMs = 5000): Promise<any> {
+export async function fetchJson(url: string, body: unknown, timeoutMs = 5000, key?: string): Promise<any> {
   const res = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...(MEMORY_KEY ? { Authorization: `Bearer ${MEMORY_KEY}` } : {}),
+      ...memGetHeaders(key),
     },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(timeoutMs),
@@ -50,13 +51,13 @@ export function stripQuestionFraming(q: string): string {
     .replace(/\?+\s*$/g, '').trim();
 }
 
-export async function recallMemories(query: string): Promise<MemoryHit[]> {
+export async function recallMemories(query: string, key?: string): Promise<MemoryHit[]> {
   // Fan-out total: frase original + versão sem framing, em global + cada projeto.
   // Merge por id (maior score), tag de origem em h.project. Best-effort por escopo.
   const queries = [query];
   const stripped = stripQuestionFraming(query);
   if (stripped.length >= 12 && stripped !== query.toLowerCase().trim()) queries.push(stripped);
-  const { includeGlobal, projects } = await getChatScopes();
+  const { includeGlobal, projects } = await getChatScopes(key);
   const scopes: Array<string | undefined> = [...(includeGlobal ? [undefined] : []), ...projects];
   if (scopes.length === 0) scopes.push(CHAT_PROJECT || undefined);
   try {
@@ -66,7 +67,7 @@ export async function recallMemories(query: string): Promise<MemoryHit[]> {
         const body = scope
           ? { query: q, project: scope, limit: CHAT_RECALL_PER_PROJECT, cached: true }
           : { query: q, limit: CHAT_RECALL_PER_PROJECT, cached: true };
-        calls.push(fetchJson(`${MEMORY_URL}/api/memory/recall`, body)
+        calls.push(fetchJson(`${MEMORY_URL}/api/memory/recall`, body, 5000, key)
           .then((data) => ({ scope, data }))
           .catch(() => ({ scope, data: [] as unknown })));
       }
@@ -151,7 +152,7 @@ export function shouldQueryGraph(query: string, graphAuto = GRAPH_AUTO): boolean
  *  Dual-query como o recall: o matching do grafo é literal por entidade, então a frase
  *  cheia ("quem é dono do projeto percurso?") volta vazia enquanto a keyword ("percurso")
  *  acerta o nó. Merge por seção `##` com dedup. */
-export async function queryGraph(query: string): Promise<string> {
+export async function queryGraph(query: string, key?: string): Promise<string> {
   if (!shouldQueryGraph(query)) return '';
   const t0 = Date.now();
   const queries = [query];
@@ -159,7 +160,7 @@ export async function queryGraph(query: string): Promise<string> {
   if (stripped.length >= 3 && stripped !== query.toLowerCase().trim()) queries.push(stripped);
   try {
     const results = await Promise.all(queries.map(q =>
-      fetchJson(`${MEMORY_URL}/api/graph/query`, { query: q, depth: 2, maxNodes: 8 }, 4000)));
+      fetchJson(`${MEMORY_URL}/api/graph/query`, { query: q, depth: 2, maxNodes: 8 }, 4000, key)));
     const seen = new Set<string>();
     const sections: string[] = [];
     for (const data of results) {
@@ -184,7 +185,7 @@ export async function queryGraph(query: string): Promise<string> {
 }
 
 /** Fire-and-forget: extrai fatos do que o usuário disse. A fala do modelo não é salva. */
-export function rememberTurn(userMsg: string, assistantText: string): void {
+export function rememberTurn(userMsg: string, assistantText: string, key?: string): void {
   const user = userMsg.trim();
   if (!user) return;
   fetchJson(`${MEMORY_URL}/api/memory/remember`,
@@ -194,7 +195,7 @@ export function rememberTurn(userMsg: string, assistantText: string): void {
       project: CHAT_PROJECT || undefined,
       mode: 'chat',
       date: getSaoPauloToday().iso,
-    }, 60_000)
+    }, 60_000, key)
     .then((r: any) => {
       const ids = Array.isArray(r) ? r.map(x => `${x.id}${x.action ? `:${x.action}` : ''}`) : [];
       console.log('[bff] remember result:', ids.length ? ids.join(', ') : 'nothing saved (empty/rejected/duplicate)');
@@ -204,9 +205,9 @@ export function rememberTurn(userMsg: string, assistantText: string): void {
 
 // ─── Escopos de leitura (fan-out) ───
 
-export async function discoverMemoryProjects(): Promise<string[]> {
+export async function discoverMemoryProjects(key?: string): Promise<string[]> {
   try {
-    const res = await fetch(`${MEMORY_URL}/api/graph/nodes`, { headers: memGetHeaders(), signal: AbortSignal.timeout(5000) });
+    const res = await fetch(`${MEMORY_URL}/api/graph/nodes`, { headers: memGetHeaders(key), signal: AbortSignal.timeout(5000) });
     if (!res.ok) return [];
     const nodes = (await res.json()) as Array<{ id: string; type: string }>;
     const seen = new Set<string>();
@@ -225,12 +226,22 @@ export async function discoverMemoryProjects(): Promise<string[]> {
 
 /** Escopos de leitura do chat (fan-out total, Opção A).
  *  - LAIN_CHAT_PROJECTS=vazio → auto: global (+flag) + discoverMemoryProjects().
- *  - LAIN_CHAT_PROJECTS=csv → allowlist explícita; 'global' no csv inclui o global.
- *  Cache de 60s: o recall roda por mensagem, não pode bater em /graph/nodes sempre. */
-let _chatScopesCache: { at: number; value: { includeGlobal: boolean; projects: string[] } } | null = null;
-export async function getChatScopes(): Promise<{ includeGlobal: boolean; projects: string[] }> {
+ *  - LAIN_CHAT_PROJECTS=csv → allowlist explícita ('global' no csv inclui o global).
+ *  Cache de 60s POR CHAVE (upstream): o recall roda por mensagem, não pode
+ *  bater em /graph/nodes sempre — mas um cache global vazaria escopos entre
+ *  tenants, então a chave do cache é o hash da bearer. */
+const _chatScopesCache = new Map<string, { at: number; value: { includeGlobal: boolean; projects: string[] } }>();
+function scopesCacheKey(key?: string): string {
+  if (!key || key === MEMORY_KEY) return 'owner';
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = ((h << 5) - h + key.charCodeAt(i)) | 0;
+  return `k${h}`;
+}
+export async function getChatScopes(key?: string): Promise<{ includeGlobal: boolean; projects: string[] }> {
+  const ck = scopesCacheKey(key);
   const now = Date.now();
-  if (_chatScopesCache && now - _chatScopesCache.at < 60_000) return _chatScopesCache.value;
+  const hit = _chatScopesCache.get(ck);
+  if (hit && now - hit.at < 60_000) return hit.value;
   let value: { includeGlobal: boolean; projects: string[] };
   if (CHAT_PROJECTS_ALLOWLIST.length > 0) {
     const lower = CHAT_PROJECTS_ALLOWLIST.map((s) => s.toLowerCase());
@@ -239,9 +250,9 @@ export async function getChatScopes(): Promise<{ includeGlobal: boolean; project
       projects: CHAT_PROJECTS_ALLOWLIST.filter((s) => s.toLowerCase() !== 'global'),
     };
   } else {
-    value = { includeGlobal: !CHAT_INCLUDE_GLOBAL_AUTO_OFF, projects: await discoverMemoryProjects() };
+    value = { includeGlobal: !CHAT_INCLUDE_GLOBAL_AUTO_OFF, projects: await discoverMemoryProjects(key) };
   }
-  _chatScopesCache = { at: now, value };
+  _chatScopesCache.set(ck, { at: now, value });
   return value;
 }
 
@@ -261,7 +272,7 @@ export interface VaultMemory {
   kind: 'fact' | 'state';
 }
 
-export async function listVaultMemories(): Promise<VaultMemory[]> {
+export async function listVaultMemories(key?: string): Promise<VaultMemory[]> {
   const out: VaultMemory[] = [];
   const seenIds = new Set<string>();
   const pushBatch = (items: any[], projectLabel: string) => {
@@ -283,7 +294,7 @@ export async function listVaultMemories(): Promise<VaultMemory[]> {
   };
   // 1. Global (sem filtro de projeto)
   try {
-    const data = await fetchJson(`${MEMORY_URL}/api/memory/list`, { limit: 200 });
+    const data = await fetchJson(`${MEMORY_URL}/api/memory/list`, { limit: 200 }, 5000, key);
     pushBatch(data, 'global');
   } catch (err) {
     console.error('[bff] vault memories failed (global):', err instanceof Error ? err.message : err);
@@ -293,11 +304,11 @@ export async function listVaultMemories(): Promise<VaultMemory[]> {
   //    O lain-memory não tem endpoint que lista projetos, então o grafo
   //    (nós type=Project) é a fonte da verdade. Falhas por projeto (ex 500
   //    em nomes com espaço) são ignoradas — não podem derrubar a página.
-  const projects = await discoverMemoryProjects();
+  const projects = await discoverMemoryProjects(key);
   await Promise.all(projects.map(async (p) => {
     if (!p || p === 'global') return;
     try {
-      const data = await fetchJson(`${MEMORY_URL}/api/memory/list`, { project: p, limit: 200 });
+      const data = await fetchJson(`${MEMORY_URL}/api/memory/list`, { project: p, limit: 200 }, 5000, key);
       pushBatch(data, p);
     } catch (err) {
       console.error(`[bff] vault memories failed (project=${p}):`, err instanceof Error ? err.message : err);
