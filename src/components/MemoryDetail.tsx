@@ -45,7 +45,7 @@ export function MemoryDetail({ memoryId, onClose, getMemory, onVote, onForget, b
 
   return (
     <Dialog open={!!memoryId} onOpenChange={() => onClose()}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-card text-card-foreground border-border data-[state=open]:animate-none data-[state=closed]:animate-none">
+      <DialogContent className="max-h-[80vh] max-w-[calc(100%-2rem)] overflow-y-auto bg-card p-4 text-card-foreground border-border data-[state=open]:animate-none data-[state=closed]:animate-none sm:max-w-lg sm:p-6">
         <motion.div
           key={memoryId ?? 'empty'}
           initial={{ opacity: 0, y: 24, scale: 0.98 }}
@@ -76,16 +76,16 @@ export function MemoryDetail({ memoryId, onClose, getMemory, onVote, onForget, b
               </DialogTitle>
             </DialogHeader>
             {(data.tags || []).length > 0 && (
-              <div className="flex flex-wrap gap-1 mb-4">
+              <div className="mb-4 flex min-w-0 flex-wrap gap-1">
                 {(data.tags || []).map((t: string) => (
-                  <Badge key={t} variant="secondary" className="text-xs">
+                  <Badge key={t} variant="secondary" className="max-w-full truncate text-xs">
                     {t.replace(/^#/, '')}
                   </Badge>
                 ))}
               </div>
             )}
             <div
-              className="text-[16px] leading-[1.8] tracking-[0.015em] whitespace-pre-wrap"
+              className="min-w-0 text-[15px] leading-[1.7] tracking-[0.01em] break-words whitespace-pre-wrap sm:text-[16px] sm:leading-[1.8] sm:tracking-[0.015em]"
               dangerouslySetInnerHTML={{
                 __html: renderWikiHtml((data.body || '').trim()),
               }}

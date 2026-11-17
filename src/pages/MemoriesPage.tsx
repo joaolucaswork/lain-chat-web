@@ -6,7 +6,7 @@ import { MemoryCard } from '@/components/MemoryCard'
 import { MemoryDetail } from '@/components/MemoryDetail'
 import { GraphDetail } from '@/components/GraphDetail'
 import { UndoBar } from '@/components/UndoBar'
-import { List } from '@phosphor-icons/react'
+import { List, Funnel } from '@phosphor-icons/react'
 import type { LayoutContext } from './Layout'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -42,6 +42,7 @@ export function MemoriesPage() {
   const [selectedGraphKey, setSelectedGraphKey] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [detailVersion, setDetailVersion] = useState(0)
+  const [showFilters, setShowFilters] = useState(false)
   const [undo, setUndo] = useState<{ message: string; run: () => void } | null>(null)
   const undoTimer = useRef<number | null>(null)
 
@@ -185,7 +186,7 @@ export function MemoriesPage() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col relative">
+    <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
       <div className="flex shrink-0 items-center gap-3 border-b border-border bg-card px-4 py-2">
         <button
           type="button"
@@ -197,8 +198,11 @@ export function MemoriesPage() {
         </button>
         <h2 className="text-sm font-semibold md:hidden">Memórias</h2>
       </div>
-      <div className="flex min-h-0 flex-1">
-      <div className="w-56 border-r border-border bg-card p-3 space-y-4 overflow-y-auto shrink-0">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col md:flex-row">
+      <div className={cn(
+        'w-full shrink-0 space-y-4 overflow-y-auto border-b border-border bg-card p-3 md:w-56 md:border-r md:border-b-0',
+        !showFilters && 'hidden md:block'
+      )}>
         <div>
           <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
             Projetos
@@ -241,7 +245,7 @@ export function MemoriesPage() {
             ))}
           </div>
         </div>
-        <div>
+        <div className="hidden md:block">
           <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
             Grafo
           </h3>
@@ -259,14 +263,34 @@ export function MemoriesPage() {
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-        <div className="p-3 border-b border-border">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="flex items-center gap-2 border-b border-border p-3">
           <Input
             placeholder="buscar memorias..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="max-w-md"
+            className="w-full min-w-0 flex-1 md:max-w-md"
           />
+          <button
+            type="button"
+            onClick={() => setShowFilters((v) => !v)}
+            aria-expanded={showFilters}
+            aria-label="Mostrar filtros"
+            className={cn(
+              'flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-2 text-xs font-medium transition-colors md:hidden',
+              showFilters || activeProject || activeTag
+                ? 'border-primary bg-primary/10 text-primary'
+                : 'border-border text-muted-foreground hover:text-foreground hover:bg-accent'
+            )}
+          >
+            <Funnel className="size-4" />
+            Filtros
+            {(activeProject || activeTag) && (
+              <span className="flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                {(activeProject ? 1 : 0) + (activeTag ? 1 : 0)}
+              </span>
+            )}
+          </button>
         </div>
         <div className="flex items-center justify-between px-3 py-1.5 text-xs text-muted-foreground">
           <span>
@@ -274,8 +298,8 @@ export function MemoriesPage() {
           </span>
           <span>{memories.length} memorias</span>
         </div>
-        <ScrollArea className="flex-1 min-h-0">
-          <div className="mx-auto w-full max-w-2xl p-6">
+        <ScrollArea className="min-h-0 min-w-0 flex-1">
+          <div className="mx-auto w-full min-w-0 max-w-2xl p-4 sm:p-6">
             {loading ? (
               <div className="text-center text-muted-foreground py-8">carregando...</div>
             ) : (

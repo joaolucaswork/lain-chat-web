@@ -21,6 +21,8 @@ export function ChatInput({ onSend, onStop, disabled, placeholder = 'Envie uma m
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
+    // WHY mobile: não puxa o foco (e o teclado) automaticamente no touch.
+    if (!window.matchMedia('(pointer: fine)').matches) return
     if (!disabled) textareaRef.current?.focus()
   }, [disabled])
 
@@ -38,9 +40,9 @@ export function ChatInput({ onSend, onStop, disabled, placeholder = 'Envie uma m
   }
 
   return (
-    <div className={bare ? 'w-full' : 'shrink-0 bg-background p-4'}>
-      <div className={bare ? 'w-full' : 'mx-auto w-full max-w-[46rem]'}>
-        <InputGroup className="rounded-3xl border-0 bg-muted px-1 py-1 shadow-none dark:bg-input/30 has-[[data-slot=input-group-control]:focus-visible]:ring-0">
+    <div className={bare ? 'w-full min-w-0' : 'shrink-0 bg-background px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4'}>
+      <div className={bare ? 'w-full min-w-0' : 'mx-auto w-full min-w-0 max-w-[46rem]'}>
+        <InputGroup className="min-w-0 rounded-3xl border-0 bg-muted px-1 py-1 shadow-none dark:bg-input/30 has-[[data-slot=input-group-control]:focus-visible]:ring-0">
           <InputGroupTextarea
             ref={textareaRef}
             value={text}
@@ -54,7 +56,8 @@ export function ChatInput({ onSend, onStop, disabled, placeholder = 'Envie uma m
             placeholder={placeholder}
             disabled={disabled}
             rows={1}
-            className="max-h-[200px] min-h-[40px] text-[16px] leading-[1.7] tracking-[0.01em]"
+            enterKeyHint="send"
+            className="max-h-[200px] min-h-[40px] min-w-0 text-[16px] leading-[1.6] tracking-[0.01em] sm:leading-[1.7]"
             aria-label="Mensagem"
           />
           <InputGroupAddon align="inline-end" className="self-center pr-3">

@@ -29,17 +29,17 @@ export function MemoryCard({ memory, onClick, onVote, onForget, busy }: MemoryCa
   return (
     <div
       className={cn(
-        'group bg-card border border-border rounded-lg p-4 cursor-pointer hover:border-primary/50 transition-colors relative',
+        'group bg-card border border-border rounded-lg p-4 cursor-pointer hover:border-primary/50 transition-colors relative min-w-0 overflow-hidden',
         fb.status === 'archived' && 'opacity-60'
       )}
       onClick={() => onClick(memory.id)}
     >
-      <div className="mb-1 truncate text-[16px] font-semibold leading-[1.7] tracking-[0.01em] text-card-foreground pr-20">
+      <div className="mb-1 truncate text-[16px] font-semibold leading-[1.7] tracking-[0.01em] text-card-foreground pr-20 break-words">
         {memory.title || formatDateTime(memory.created)}
       </div>
-      <div className="flex gap-3 text-xs text-muted-foreground mb-1 items-center">
-        <span>{formatDateTime(memory.created)}</span>
-        <span>{memory.project}</span>
+      <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground mb-1 items-center">
+        <span className="break-words">{formatDateTime(memory.created)}</span>
+        <span className="min-w-0 truncate">{memory.project}</span>
         {fb.status === 'archived' && (
           <Badge variant="outline" className="text-[10px] px-1.5 py-0">
             arquivada
@@ -54,13 +54,13 @@ export function MemoryCard({ memory, onClick, onVote, onForget, busy }: MemoryCa
           <span className="text-[10px]" title="Estado temporário — perde peso com o tempo">◔</span>
         )}
       </div>
-      <div className="line-clamp-2 text-[16px] leading-[1.8] tracking-[0.015em] text-muted-foreground">
+      <div className="line-clamp-2 min-w-0 text-[16px] leading-[1.8] tracking-[0.015em] text-muted-foreground break-words">
         {memory.preview}
       </div>
       {tags.length > 0 && (
-        <div className="flex flex-wrap gap-1 mt-2">
+        <div className="mt-2 flex min-w-0 flex-wrap gap-1">
           {tags.map((t) => (
-            <Badge key={t} variant="secondary" className="text-[10px] px-1.5 py-0">
+            <Badge key={t} variant="secondary" className="max-w-full truncate px-1.5 py-0 text-[10px]">
               {t.replace(/^#/, '')}
             </Badge>
           ))}
@@ -69,7 +69,7 @@ export function MemoryCard({ memory, onClick, onVote, onForget, busy }: MemoryCa
 
       {(onVote || onForget) && (
         <div
-          className="absolute top-3 right-3 hidden group-hover:flex items-center gap-1"
+          className="absolute top-3 right-3 hidden group-hover:flex items-center gap-1 [@media(hover:none)]:flex"
           onClick={stop}
         >
           {onVote && (

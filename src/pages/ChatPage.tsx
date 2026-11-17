@@ -14,8 +14,8 @@ export function ChatPage() {
   const isEmpty = messages.length === 0 && !processing
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex shrink-0 items-center gap-3 bg-transparent px-4 pt-3 pb-5">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-clip">
+      <div className="flex shrink-0 items-center gap-3 bg-transparent px-3 pt-3 pb-4 sm:px-4 sm:pb-5">
         <button
           type="button"
           aria-label="Abrir menu"
@@ -34,7 +34,7 @@ export function ChatPage() {
       {isEmpty ? (
         <motion.div
           key="composer-center"
-          className="flex min-h-0 flex-1 flex-col items-center justify-center px-4"
+          className="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-start overflow-y-auto px-3 pt-8 sm:justify-center sm:px-4 sm:pt-0"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.25 }}
@@ -60,7 +60,7 @@ export function ChatPage() {
               placeholder="Envie uma mensagem..."
             />
           </motion.div>
-          <div className="w-full max-w-[804px] overflow-hidden pt-6">
+          <div className="w-full max-w-[804px] min-w-0 overflow-hidden pt-4 sm:pt-6">
             <RecentMemories />
           </div>
         </motion.div>
@@ -68,7 +68,7 @@ export function ChatPage() {
         <>
           <motion.div
             key="messages"
-            className="flex min-h-0 flex-1 flex-col"
+            className="flex min-h-0 min-w-0 flex-1 flex-col"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.25 }}
@@ -78,7 +78,7 @@ export function ChatPage() {
           <motion.div
             layoutId="composer"
             transition={spring}
-            className="shrink-0"
+            className="min-w-0 shrink-0"
           >
             <ChatInput onSend={sendMessage} onStop={stopGenerating} disabled={processing} placeholder="Envie uma mensagem..." />
           </motion.div>

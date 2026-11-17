@@ -95,14 +95,26 @@ export function ChatMessages({ messages, processing, onRetry }: ChatMessagesProp
     if (stickRef.current) scrollToEnd()
   }, [messages, processing])
 
+  // WHY mobile: abrir/fechar o teclado muda a altura do viewport da lista.
+  // Reancora no fim para as mensagens não "sumirem" para cima no foco do input.
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    const onResize = () => {
+      if (stickRef.current) scrollToEnd()
+    }
+    vv.addEventListener('resize', onResize)
+    return () => vv.removeEventListener('resize', onResize)
+  }, [])
+
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col">
+    <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-clip">
       <div
         ref={viewportRef}
         role="log"
         aria-label="Messages"
         tabIndex={0}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain outline-none"
+        className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain outline-none"
         onScroll={() => {
           stickRef.current = isNearBottom()
           setShowJump(!stickRef.current)
@@ -115,7 +127,7 @@ export function ChatMessages({ messages, processing, onRetry }: ChatMessagesProp
           })
         }}
       >
-        <div className="chat-body mx-auto flex w-full max-w-[46rem] flex-col gap-8 px-6 py-6">
+        <div className="chat-body mx-auto flex w-full min-w-0 max-w-[46rem] flex-col gap-6 px-4 py-4 sm:gap-8 sm:px-6 sm:py-6">
           {messages.length === 0 && !processing && (
             <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">
               Comece uma conversa
@@ -124,15 +136,15 @@ export function ChatMessages({ messages, processing, onRetry }: ChatMessagesProp
           {messages.map((msg, i) => {
             if (msg.role === 'user') {
               return (
-                <div key={i} data-message-id={`msg-${i}`}>
+                <div key={i} data-message-id={`msg-${i}`} className="min-w-0">
                   <Message align="end">
-                    <MessageContent>
+                    <MessageContent className="min-w-0">
                       <Bubble
                         variant="secondary"
                         align="end"
-                        className="*:data-[slot=bubble-content]:bg-[#E4E4E7] *:data-[slot=bubble-content]:text-zinc-900 dark:*:data-[slot=bubble-content]:bg-[#2E2F31] dark:*:data-[slot=bubble-content]:text-neutral-100"
+                        className="max-w-[88%] min-w-0 sm:max-w-[80%] *:data-[slot=bubble-content]:bg-[#E4E4E7] *:data-[slot=bubble-content]:text-zinc-900 dark:*:data-[slot=bubble-content]:bg-[#2E2F31] dark:*:data-[slot=bubble-content]:text-neutral-100"
                       >
-                        <BubbleContent className="whitespace-pre-wrap text-[16px] font-[360] leading-[1.8] tracking-[0.015em]">
+                        <BubbleContent className="min-w-0 max-w-full overflow-hidden whitespace-pre-wrap text-[15px] font-[360] leading-[1.7] tracking-[0.01em] break-words sm:text-[16px] sm:leading-[1.8] sm:tracking-[0.015em]">
                           {msg.content}
                         </BubbleContent>
                       </Bubble>
@@ -144,11 +156,11 @@ export function ChatMessages({ messages, processing, onRetry }: ChatMessagesProp
 
             if (msg.role === 'system') {
               return (
-                <div key={i} data-message-id={`msg-${i}`}>
+                <div key={i} data-message-id={`msg-${i}`} className="min-w-0">
                   <Message align="start">
-                    <MessageContent>
-                      <Bubble variant="destructive">
-                        <BubbleContent className="whitespace-pre-wrap text-[16px] font-[360] leading-[1.8] tracking-[0.015em]">
+                    <MessageContent className="min-w-0">
+                      <Bubble variant="destructive" className="min-w-0 max-w-full">
+                        <BubbleContent className="min-w-0 max-w-full whitespace-pre-wrap text-[15px] font-[360] leading-[1.7] tracking-[0.01em] break-words sm:text-[16px] sm:leading-[1.8] sm:tracking-[0.015em]">
                           {msg.content}
                         </BubbleContent>
                       </Bubble>
@@ -176,11 +188,11 @@ export function ChatMessages({ messages, processing, onRetry }: ChatMessagesProp
             }
 
             return (
-              <div key={i} data-message-id={`msg-${i}`}>
+              <div key={i} data-message-id={`msg-${i}`} className="min-w-0">
                 <Message align="start">
-                  <MessageContent>
-                    <Bubble variant="ghost">
-                      <BubbleContent className="max-w-full text-[16px] font-[360] leading-[1.8] tracking-[0.015em]">
+                  <MessageContent className="min-w-0">
+                    <Bubble variant="ghost" className="min-w-0 max-w-full">
+                      <BubbleContent className="min-w-0 max-w-full overflow-hidden text-[15px] font-[360] leading-[1.7] tracking-[0.01em] break-words sm:text-[16px] sm:leading-[1.8] sm:tracking-[0.015em] [&_pre]:max-w-full [&_pre]:overflow-x-auto [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto">
                         <Streamdown>{msg.content}</Streamdown>
                       </BubbleContent>
                     </Bubble>

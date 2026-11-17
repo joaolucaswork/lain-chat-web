@@ -32,7 +32,7 @@ export function GraphDetail({ nodeKey, onClose, getNode }: GraphDetailProps) {
 
   return (
     <Dialog open={!!nodeKey} onOpenChange={() => onClose()}>
-      <DialogContent className="max-w-2xl max-h-[70vh] overflow-y-auto">
+      <DialogContent className="max-h-[70vh] max-w-[calc(100%-2rem)] overflow-y-auto p-4 sm:max-w-lg sm:p-6">
         {loading ? (
           <div className="text-center text-muted-foreground py-8">Loading...</div>
         ) : data ? (
@@ -44,7 +44,7 @@ export function GraphDetail({ nodeKey, onClose, getNode }: GraphDetailProps) {
             </DialogHeader>
             <div className="text-xs text-muted-foreground mb-3">{data.type || ''}</div>
             <div
-              className="text-sm leading-relaxed whitespace-pre-wrap"
+              className="min-w-0 text-sm leading-relaxed break-words whitespace-pre-wrap"
               dangerouslySetInnerHTML={{
                 __html: renderWikiHtml((data.body || '').trim()),
               }}

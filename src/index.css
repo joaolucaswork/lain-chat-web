@@ -126,6 +126,26 @@
   button:not(:disabled) {
     cursor: pointer;
   }
+  html,
+  body {
+    /* WHY mobile: o teclado virtual muda o visualViewport sem redimensionar
+       o layout (iOS) ou redimensiona (Android). A altura do app é sincronizada
+       via JS (visualViewport.height) e a página nunca rola — só as áreas
+       internas. Sem isso o Safari rola a página no foco do input e as
+       mensagens "somem" para cima. */
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+    max-width: 100%;
+  }
+  #root {
+    height: 100%;
+  }
+  img,
+  video,
+  svg {
+    max-width: 100%;
+  }
   body {
     @apply bg-background text-foreground;
     font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', 'Segoe UI', system-ui, sans-serif;
@@ -137,6 +157,42 @@
     line-height: 1.8;
     letter-spacing: 0.015em;
     font-weight: 360;
+    min-width: 0;
+    overflow-wrap: break-word;
+  }
+  /* WHY mobile: o markdown do assistant (Streamdown) pode emitir pre/table
+     com largura intrínseca grande. Sem estas travas a caixa estoura o
+     viewport em vez de rolar internamente. */
+  .chat-body pre {
+    max-width: 100%;
+    overflow-x: auto;
+    white-space: pre;
+  }
+  .chat-body code {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+  .chat-body table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  .chat-body a,
+  .chat-body p,
+  .chat-body li {
+    overflow-wrap: anywhere;
+  }
+  .chat-body img,
+  .chat-body video {
+    max-width: 100%;
+    height: auto;
+  }
+  @media (max-width: 640px) {
+    .chat-body {
+      font-size: 15px;
+      line-height: 1.7;
+    }
   }
   .chat-body p {
     margin-block: 0.75em;

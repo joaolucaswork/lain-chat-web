@@ -1,10 +1,10 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { useModel } from '@/hooks/useModel'
 import { useChat } from '@/hooks/useChat'
 import type { ChatMessage, Session } from '@/types'
-import { ChatTeardrop, Brain, Trash, Gear, List, Plus, SidebarSimple, DotsThree, PencilSimple, Star, Check } from '@phosphor-icons/react'
+import { ChatTeardrop, Brain, Trash, Gear, Plus, SidebarSimple, DotsThree, PencilSimple, Star, Check } from '@phosphor-icons/react'
 import {
   Tooltip,
   TooltipContent,
@@ -109,6 +109,22 @@ export function Layout() {
   const [renameValue, setRenameValue] = useState('')
   const { model } = useModel()
   const chat = useChat(model)
+  const rootRef = useRef<HTMLDivElement>(null)
+
+  // WHY mobile: acompanha o visualViewport (altura com teclado aberto).
+  // iOS não redimensiona o layout no teclado — sem isso o app fica com a
+  // altura cheia sob o teclado e o navegador rola a página no foco do input.
+  useEffect(() => {
+    const el = rootRef.current
+    const vv = window.visualViewport
+    if (!el || !vv) return
+    const sync = () => {
+      el.style.height = `${vv.height}px`
+    }
+    sync()
+    vv.addEventListener('resize', sync)
+    return () => vv.removeEventListener('resize', sync)
+  }, [])
 
   const isChatRoute = location.pathname === '/'
 
@@ -285,7 +301,7 @@ export function Layout() {
             setOpenMenuId(menuOpen ? null : s.id)
           }}
           className={cn(
-            'flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-background focus-visible:opacity-100',
+            'flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-background focus-visible:opacity-100 [@media(hover:none)]:opacity-100',
             menuOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
           )}
         >
@@ -447,7 +463,7 @@ export function Layout() {
   )
 
   return (
-    <div className="flex h-svh overflow-hidden bg-background">
+    <div ref={rootRef} className="flex h-screen overflow-hidden bg-background supports-[height:100dvh]:h-dvh">
       {/* Rail de ícones — só ícones, sem títulos */}
       <nav
         aria-label="Navegação principal"
@@ -547,7 +563,7 @@ export function Layout() {
       )}
 
       {/* Conteúdo */}
-      <div className="flex min-h-0 flex-1 flex-col bg-background">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
         <Outlet
           context={
             {
@@ -567,80 +583,77 @@ export function Layout() {
         />
       </div>
 
-      {/* Drawer mobile: rail + chats */}
+      {/* Drawer mobile: coluna única — histórico em largura total */}
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetContent
           side="left"
-          className="flex w-[300px] gap-0 p-0 sm:w-[340px]"
+          className="flex w-[85vw] max-w-[320px] flex-col gap-0 p-0"
         >
           <SheetHeader className="sr-only">
             <SheetTitle>Navegação</SheetTitle>
           </SheetHeader>
-          <div className="flex w-[60px] shrink-0 flex-col items-center gap-1 border-r border-sidebar-border bg-sidebar py-3 dark:bg-[#111113]">
-            <button
-              type="button"
-              aria-label="Fechar menu"
-              onClick={() => setMobileOpen(false)}
-              className="mb-2 flex size-9 items-center justify-center rounded-lg bg-primary text-lg font-bold text-primary-foreground"
-            >
+          <div className="flex shrink-0 items-center gap-2 border-b border-sidebar-border bg-sidebar py-2.5 pr-12 pl-3 dark:bg-[#111113]">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-base font-bold text-primary-foreground">
               L
-            </button>
+            </span>
+            <span className="min-w-0 flex-1 truncate text-sm font-semibold text-sidebar-foreground">
+              Lain
+            </span>
             <button
               type="button"
               aria-label="Nova conversa"
+              title="Nova conversa"
               onClick={() => void handleNewChat()}
-              className="flex size-10 items-center justify-center rounded-lg text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
             >
               <Plus className="size-5" weight="bold" />
             </button>
+          </div>
+          <nav
+            aria-label="Navegação principal"
+            className="flex shrink-0 items-center gap-1 border-b border-sidebar-border bg-sidebar px-2 py-2 dark:bg-[#111113]"
+          >
             <Link
               to="/"
-              aria-label="Chat"
               onClick={() => setMobileOpen(false)}
               className={cn(
-                'flex size-10 items-center justify-center rounded-lg',
+                'flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-medium',
                 location.pathname === '/'
                   ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                  : 'text-muted-foreground hover:bg-sidebar-accent'
+                  : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
               )}
             >
-              <ChatTeardrop className="size-5" weight="bold" />
+              <ChatTeardrop className="size-4 shrink-0" weight="bold" />
+              <span className="truncate">Chat</span>
             </Link>
             <Link
               to="/memorias"
-              aria-label="Memórias"
               onClick={() => setMobileOpen(false)}
               className={cn(
-                'flex size-10 items-center justify-center rounded-lg',
+                'flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-medium',
                 location.pathname === '/memorias'
                   ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                  : 'text-muted-foreground hover:bg-sidebar-accent'
+                  : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
               )}
             >
-              <Brain className="size-5" weight="regular" />
+              <Brain className="size-4 shrink-0" weight="regular" />
+              <span className="truncate">Memórias</span>
             </Link>
-            <div className="flex-1" />
             <Link
               to="/settings"
-              aria-label="Configurações"
               onClick={() => setMobileOpen(false)}
               className={cn(
-                'flex size-10 items-center justify-center rounded-lg',
+                'flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-medium',
                 location.pathname === '/settings'
                   ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                  : 'text-muted-foreground hover:bg-sidebar-accent'
+                  : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
               )}
             >
-              <Gear className="size-5" weight="bold" />
+              <Gear className="size-4 shrink-0" weight="bold" />
+              <span className="truncate">Ajustes</span>
             </Link>
-          </div>
-          <div className="flex min-h-0 flex-1 flex-col bg-sidebar dark:bg-[#111113]">
-            <div className="flex shrink-0 items-center gap-2 px-3 pt-3 pb-1">
-              <List className="size-4 text-muted-foreground" />
-              <span className="text-xs font-medium text-muted-foreground">
-                Menu
-              </span>
-            </div>
+          </nav>
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-sidebar dark:bg-[#111113]">
             {chatsPanel(false)}
           </div>
         </SheetContent>
