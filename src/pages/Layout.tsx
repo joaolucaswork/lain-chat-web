@@ -161,6 +161,17 @@ export function Layout() {
   const openMobileNav = useCallback(() => setMobileOpen(true), [])
 
   useEffect(() => {
+    const onToggleHistory = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+        e.preventDefault()
+        setHistoryCollapsed((v) => !v)
+      }
+    }
+    window.addEventListener('keydown', onToggleHistory)
+    return () => window.removeEventListener('keydown', onToggleHistory)
+  }, [])
+
+  useEffect(() => {
     if (!openMenuId) {
       setConfirmDeleteId(null)
       return
@@ -387,8 +398,8 @@ export function Layout() {
         {withToggle && (
           <button
             type="button"
-            title="Retrair histórico"
-            aria-label="Retrair histórico"
+            title="Retrair histórico (Ctrl+B)"
+            aria-label="Retrair histórico (Ctrl+B)"
             onClick={() => setHistoryCollapsed(true)}
             className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           >
@@ -478,7 +489,7 @@ export function Layout() {
           className="overflow-hidden"
         >
           <IconRailButton
-            label="Expandir histórico"
+            label="Expandir histórico (Ctrl+B)"
             onClick={() => {
               if (!isChatRoute) {
                 setHistoryCollapsed(false)

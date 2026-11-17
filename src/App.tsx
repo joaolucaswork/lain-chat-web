@@ -1,6 +1,7 @@
 import { Suspense, lazy } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { RouteFallback } from '@/components/RouteFallback'
 import { Layout } from '@/pages/Layout'
 import { ChatPage } from '@/pages/ChatPage'
 
@@ -24,7 +25,7 @@ export default function App() {
             <Route
               path="/memorias"
               element={
-                <Suspense fallback={null}>
+                <Suspense fallback={<RouteFallback variant="memories" />}>
                   <MemoriesPage />
                 </Suspense>
               }
@@ -32,7 +33,7 @@ export default function App() {
             <Route
               path="/settings"
               element={
-                <Suspense fallback={null}>
+                <Suspense fallback={<RouteFallback variant="settings" />}>
                   <SettingsPage />
                 </Suspense>
               }
