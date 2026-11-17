@@ -23,11 +23,24 @@ export interface LayoutContext {
   openMobileNav: () => void
 }
 
+const HISTORY_COLLAPSED_KEY = 'lain-history-collapsed'
+const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 30
+
 export function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [historyCollapsed, setHistoryCollapsed] = useState(false)
+  const [historyCollapsed, setHistoryCollapsed] = useState<boolean>(() => {
+    // WHY persist: mantém o estado retraído/expandido entre reloads.
+    // Lê localStorage primeiro, cai para o cookie `sidebar_state` (convenção shadcn).
+    try {
+      const stored = localStorage.getItem(HISTORY_COLLAPSED_KEY)
+      if (stored !== null) return stored === '1'
+      const match = document.cookie.match(/(?:^|;\s*)sidebar_state=([^;]*)/)
+      if (match) return match[1] === 'false'
+    } catch {}
+    return false
+  })
   const { model } = useModel()
   const chat = useChat(model)
   const sess = useSessions({ activeSessionId: chat.sessionId, clearActiveSession: chat.clearSession })
@@ -47,6 +60,14 @@ export function Layout() {
     vv.addEventListener('resize', sync)
     return () => vv.removeEventListener('resize', sync)
   }, [])
+
+  // WHY persist: salva retraído/expandido em localStorage + cookie `sidebar_state`.
+  useEffect(() => {
+    try {
+      localStorage.setItem(HISTORY_COLLAPSED_KEY, historyCollapsed ? '1' : '0')
+      document.cookie = `sidebar_state=${String(!historyCollapsed)}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
+    } catch {}
+  }, [historyCollapsed])
 
   const isChatRoute = location.pathname === '/'
 
