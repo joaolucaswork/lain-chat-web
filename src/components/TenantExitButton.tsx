@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { SignOut } from '@phosphor-icons/react'
-import { clearTenantName, getTenantName } from '@/hooks/useMe'
+import { clearTenantName, getTenantName, useMeMode } from '@/hooks/useMe'
 
 /**
  * Saída do visitante (T6/T7): apaga TODOS os dados do tenant no lain-memory
@@ -8,6 +8,7 @@ import { clearTenantName, getTenantName } from '@/hooks/useMe'
  */
 export function TenantExitButton({ compact }: { compact?: boolean }) {
   const [busy, setBusy] = useState(false)
+  const meMode = useMeMode()
 
   async function exit() {
     if (busy) return
@@ -35,7 +36,7 @@ export function TenantExitButton({ compact }: { compact?: boolean }) {
     window.location.href = '/'
   }
 
-  if (!getTenantName()) return null
+  if (!getTenantName() && meMode !== 'tenant') return null
   return (
     <button
       type="button"

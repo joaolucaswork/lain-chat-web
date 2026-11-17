@@ -1,11 +1,11 @@
-import { Suspense, lazy, useState } from 'react'
+import { Suspense, lazy, useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { RouteFallback } from '@/components/RouteFallback'
 import { TenantGate } from '@/components/TenantGate'
 import { Layout } from '@/pages/Layout'
 import { ChatPage } from '@/pages/ChatPage'
-import { MeContext, getTenantName, useMe, useMeMode } from '@/hooks/useMe'
+import { MeContext, clearTenantName, getTenantName, useMe, useMeMode } from '@/hooks/useMe'
 
 // WHY: ChatPage fica no bundle inicial (rota / é o chat); Memórias/Settings
 // saem do inicial via lazy — reduz o carregamento sem tocar na experiência
@@ -20,6 +20,15 @@ const SettingsPage = lazy(() =>
 function DemoGate({ children }: { children: React.ReactNode }) {
   const mode = useMe()
   const [, setTick] = useState(0)
+  // Cookie sumiu (limpeza manual/expiração) mas o nome ficou: sem key não há
+  // conta — e sem limpar, o browser sem cookie cairia no escopo owner no BFF.
+  // Limpa e volta pro gate (o nome antigo segue reservado: 409 no re-signup).
+  useEffect(() => {
+    if (mode === 'demo' && getTenantName()) {
+      clearTenantName()
+      setTick((t) => t + 1)
+    }
+  }, [mode])
   if (mode === 'unknown') return <RouteFallback variant="memories" />
   // owner (modo legado) nunca vê o gate; demo sem cookie vê; tenant entra direto.
   if (mode === 'demo' && !getTenantName()) {
