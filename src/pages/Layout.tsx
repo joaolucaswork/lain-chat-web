@@ -1,21 +1,15 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { motion, AnimatePresence } from 'motion/react'
+import { motion } from 'motion/react'
 import { useModel } from '@/hooks/useModel'
 import { useChat } from '@/hooks/useChat'
+import { useSessions } from '@/hooks/useSessions'
 import type { ChatMessage, Session } from '@/types'
-import { ChatTeardrop, Brain, Trash, Gear, Plus, SidebarSimple, DotsThree, PencilSimple, Star, Check } from '@phosphor-icons/react'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet'
+import { ChatTeardrop, Brain, Gear, Plus, SidebarSimple } from '@phosphor-icons/react'
+import { IconRailButton, IconRailLink } from '@/components/layout/IconRail'
+import { ChatsPanel } from '@/components/layout/ChatsPanel'
+import { SessionRow } from '@/components/layout/SessionRow'
+import { MobileNav } from '@/components/layout/MobileNav'
 import { cn } from '@/lib/utils'
 
 export interface LayoutContext {
@@ -29,86 +23,14 @@ export interface LayoutContext {
   openMobileNav: () => void
 }
 
-function IconRailButton({
-  label,
-  active,
-  onClick,
-  children,
-}: {
-  label: string
-  active?: boolean
-  onClick?: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          aria-label={label}
-          title={label}
-          onClick={onClick}
-          className={cn(
-            'flex size-10 items-center justify-center rounded-lg transition-colors',
-            active
-              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-              : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-          )}
-        >
-          {children}
-        </button>
-      </TooltipTrigger>
-      <TooltipContent side="right">{label}</TooltipContent>
-    </Tooltip>
-  )
-}
-
-function IconRailLink({
-  to,
-  label,
-  active,
-  children,
-}: {
-  to: string
-  label: string
-  active?: boolean
-  children: React.ReactNode
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Link
-          to={to}
-          aria-label={label}
-          title={label}
-          className={cn(
-            'flex size-10 items-center justify-center rounded-lg transition-colors',
-            active
-              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-              : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-          )}
-        >
-          {children}
-        </Link>
-      </TooltipTrigger>
-      <TooltipContent side="right">{label}</TooltipContent>
-    </Tooltip>
-  )
-}
-
 export function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
-  const [sessions, setSessions] = useState<Session[]>([])
-  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [historyCollapsed, setHistoryCollapsed] = useState(false)
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
-  const [renamingId, setRenamingId] = useState<string | null>(null)
-  const [renameValue, setRenameValue] = useState('')
   const { model } = useModel()
   const chat = useChat(model)
+  const sess = useSessions({ activeSessionId: chat.sessionId, clearActiveSession: chat.clearSession })
   const rootRef = useRef<HTMLDivElement>(null)
 
   // WHY mobile: acompanha o visualViewport (altura com teclado aberto).
@@ -128,51 +50,17 @@ export function Layout() {
 
   const isChatRoute = location.pathname === '/'
 
-  const refreshSessions = useCallback(async () => {
-    try {
-      const res = await fetch('/api/sessions')
-      const data = await res.json()
-      setSessions(data.sessions || [])
-    } catch {}
-  }, [])
-
   const focusComposer = useCallback(() => {
     setTimeout(() => window.dispatchEvent(new Event('lain:focus-composer')), 50)
   }, [])
 
-  useEffect(() => {
-    refreshSessions()
-    const interval = setInterval(refreshSessions, 10000)
-    return () => clearInterval(interval)
-  }, [refreshSessions])
-
   const handleNewChat = useCallback(async () => {
     await chat.clearSession()
-    await refreshSessions()
+    await sess.refreshSessions()
     setMobileOpen(false)
     if (location.pathname !== '/') navigate('/')
     focusComposer()
-  }, [chat, refreshSessions, location.pathname, navigate, focusComposer])
-
-  const handleDeleteSession = useCallback(
-    async (id: string) => {
-      setDeletingId(id)
-      try {
-        const res = await fetch(`/api/sessions/${encodeURIComponent(id)}`, {
-          method: 'DELETE',
-        })
-        if (!res.ok) throw new Error('delete failed')
-        if (id === chat.sessionId) {
-          await chat.clearSession()
-        }
-        await refreshSessions()
-      } catch {
-      } finally {
-        setDeletingId(null)
-      }
-    },
-    [chat, refreshSessions]
-  )
+  }, [chat, sess, location.pathname, navigate, focusComposer])
 
   const openMobileNav = useCallback(() => setMobileOpen(true), [])
 
@@ -187,280 +75,59 @@ export function Layout() {
     return () => window.removeEventListener('keydown', onToggleHistory)
   }, [])
 
-  useEffect(() => {
-    if (!openMenuId) {
-      setConfirmDeleteId(null)
+  const switchToSession = useCallback((s: Session) => {
+    chat.switchSession(s.id)
+    void sess.refreshSessions()
+    setMobileOpen(false)
+    if (location.pathname !== '/') navigate('/')
+  }, [chat, sess, location.pathname, navigate])
+
+  const toggleFavorite = useCallback((s: Session) => {
+    sess.setOpenMenuId(null)
+    sess.patchSession(s.id, { favorite: !s.favorite }).catch(() => {})
+  }, [sess])
+
+  const deleteSession = useCallback((s: Session) => {
+    if (sess.confirmDeleteId !== s.id) {
+      sess.setConfirmDeleteId(s.id)
       return
     }
-    const close = () => {
-      setOpenMenuId(null)
-      setConfirmDeleteId(null)
-    }
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setOpenMenuId(null)
-        setConfirmDeleteId(null)
-      }
-    }
-    document.addEventListener('click', close)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('click', close)
-      document.removeEventListener('keydown', onKey)
-    }
-  }, [openMenuId])
+    sess.setOpenMenuId(null)
+    sess.setConfirmDeleteId(null)
+    void sess.handleDeleteSession(s.id)
+  }, [sess])
 
-  const patchSession = useCallback(
-    async (id: string, patch: { title?: string; favorite?: boolean }) => {
-      const res = await fetch(`/api/sessions/${encodeURIComponent(id)}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patch),
-      })
-      if (!res.ok) throw new Error('patch failed')
-      await refreshSessions()
-    },
-    [refreshSessions]
-  )
+  const renderRow = useCallback((s: Session) => (
+    <SessionRow
+      key={s.id}
+      session={s}
+      active={s.id === chat.sessionId}
+      renaming={sess.renamingId === s.id}
+      renameValue={sess.renameValue}
+      setRenameValue={sess.setRenameValue}
+      menuOpen={sess.openMenuId === s.id}
+      confirmDelete={sess.confirmDeleteId === s.id}
+      deleting={sess.deletingId === s.id}
+      onSwitch={switchToSession}
+      onToggleMenu={() => sess.toggleMenu(s.id)}
+      onStartRename={sess.startRename}
+      onSaveRename={(row) => void sess.saveRename(row)}
+      onCancelRename={() => sess.setRenamingId(null)}
+      onToggleFavorite={toggleFavorite}
+      onDelete={deleteSession}
+    />
+  ), [chat.sessionId, sess, switchToSession, toggleFavorite, deleteSession])
 
-  const startRename = useCallback((s: Session) => {
-    setOpenMenuId(null)
-    setRenameValue(s.title || s.preview || '')
-    setRenamingId(s.id)
-  }, [])
-
-  const saveRename = useCallback(
-    async (s: Session) => {
-      const id = s.id
-      const value = renameValue.trim()
-      setRenamingId(null)
-      if (!value || value === (s.title || s.preview || '')) return
-      try {
-        await patchSession(id, { title: value })
-      } catch {}
-    },
-    [renameValue, patchSession]
-  )
-
-  const favorites = sessions.filter((s) => s.favorite)
-  const rest = sessions.filter((s) => !s.favorite)
-
-  const renderRow = (s: Session) => {
-    const active = s.id === chat.sessionId
-    const menuOpen = openMenuId === s.id
-    return (
-      <div
-        key={s.id}
-        className={cn(
-          'group relative flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-sm transition-colors',
-          active
-            ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-            : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-        )}
-      >
-        {s.favorite && (
-          <ChatTeardrop className="size-4 shrink-0" weight="bold" aria-hidden />
-        )}
-        {renamingId === s.id ? (
-          <input
-            autoFocus
-            value={renameValue}
-            maxLength={80}
-            onChange={(e) => setRenameValue(e.target.value)}
-            onFocus={(e) => e.target.select()}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') void saveRename(s)
-              if (e.key === 'Escape') setRenamingId(null)
-            }}
-            onBlur={() => void saveRename(s)}
-            aria-label="Renomear conversa"
-            className="min-w-0 flex-1 rounded border border-sidebar-ring bg-background px-1 py-0.5 text-sm text-foreground outline-none"
-          />
-        ) : (
-          <button
-            type="button"
-            title={s.title || s.preview || s.id}
-            onClick={() => {
-              chat.switchSession(s.id)
-              void refreshSessions()
-              setMobileOpen(false)
-              if (location.pathname !== '/') navigate('/')
-            }}
-            className="min-w-0 flex-1 truncate text-left"
-          >
-            {s.title || s.preview || 'Nova conversa'}
-          </button>
-        )}
-        <button
-          type="button"
-          aria-label="Opções da conversa"
-          aria-expanded={menuOpen}
-          onClick={(e) => {
-            e.stopPropagation()
-            setConfirmDeleteId(null)
-            setOpenMenuId(menuOpen ? null : s.id)
-          }}
-          className={cn(
-            'flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-background focus-visible:opacity-100 [@media(hover:none)]:opacity-100',
-            menuOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-          )}
-        >
-          <DotsThree className="size-4 rotate-90" weight="bold" />
-        </button>
-        {menuOpen && (
-          <div
-            role="menu"
-            onClick={(e) => e.stopPropagation()}
-            className="absolute top-full right-0 z-30 mt-1 w-44 rounded-md bg-popover p-1 shadow-md"
-          >
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => startRename(s)}
-              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-popover-foreground hover:bg-accent"
-            >
-              <PencilSimple className="size-3.5" />
-              Renomear
-            </button>
-            <button
-              type="button"
-              role="menuitem"
-              onClick={async () => {
-                setOpenMenuId(null)
-                try {
-                  await patchSession(s.id, { favorite: !s.favorite })
-                } catch {}
-              }}
-              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-popover-foreground hover:bg-accent"
-            >
-              <Star
-                className="size-3.5"
-                weight={s.favorite ? 'fill' : 'regular'}
-              />
-              {s.favorite ? 'Desfavoritar' : 'Favoritar'}
-            </button>
-            <div className="mx-2 my-1 h-px bg-border" />
-            <button
-              type="button"
-              role="menuitem"
-              disabled={deletingId === s.id}
-              onClick={() => {
-                if (confirmDeleteId !== s.id) {
-                  setConfirmDeleteId(s.id)
-                  return
-                }
-                setOpenMenuId(null)
-                setConfirmDeleteId(null)
-                void handleDeleteSession(s.id)
-              }}
-              className={cn(
-                'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-accent disabled:opacity-50',
-                confirmDeleteId === s.id
-                  ? 'text-destructive'
-                  : 'text-popover-foreground'
-              )}
-            >
-              <AnimatePresence mode="wait" initial={false}>
-                <motion.span
-                  key={confirmDeleteId === s.id ? 'check' : 'trash'}
-                  initial={{ scale: 0.5, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.5, opacity: 0 }}
-                  transition={{ duration: 0.15, ease: 'easeOut' }}
-                  className="flex"
-                >
-                  {confirmDeleteId === s.id ? (
-                    <Check className="size-3.5" weight="bold" />
-                  ) : (
-                    <Trash className="size-3.5" />
-                  )}
-                </motion.span>
-              </AnimatePresence>
-              <AnimatePresence mode="wait" initial={false}>
-                <motion.span
-                  key={
-                    deletingId === s.id
-                      ? 'Excluindo...'
-                      : confirmDeleteId === s.id
-                        ? 'Confirmar exclusão'
-                        : 'Excluir'
-                  }
-                  initial={{ x: -8, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  exit={{ x: 8, opacity: 0 }}
-                  transition={{ duration: 0.12, ease: 'easeOut' }}
-                  className="flex"
-                >
-                  {deletingId === s.id
-                    ? 'Excluindo...'
-                    : confirmDeleteId === s.id
-                      ? 'Confirmar exclusão'
-                      : 'Excluir'}
-                </motion.span>
-              </AnimatePresence>
-            </button>
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  const chatsPanel = (withToggle: boolean) => (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex shrink-0 items-center justify-between px-3 pt-3 pb-2">
-        <span className="px-1 text-sm font-semibold text-sidebar-foreground">
-          Conversas
-        </span>
-        {withToggle && (
-          <button
-            type="button"
-            title="Retrair histórico (Ctrl+B)"
-            aria-label="Retrair histórico (Ctrl+B)"
-            onClick={() => setHistoryCollapsed(true)}
-            className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-          >
-            <SidebarSimple className="size-4" weight="bold" />
-          </button>
-        )}
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-        {sessions.length === 0 ? (
-          <p className="px-2 py-4 text-center text-xs text-muted-foreground">
-            Nenhuma conversa
-          </p>
-        ) : (
-          <>
-            {favorites.length > 0 && (
-              <div className="mb-1">
-                <div className="flex items-center gap-1.5 px-2 pt-1 pb-1.5">
-                  <span className="text-xs font-medium text-muted-foreground">
-                    Favoritos
-                  </span>
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  {favorites.map(renderRow)}
-                </div>
-              </div>
-            )}
-            {(favorites.length === 0 || rest.length > 0) && (
-              <div>
-                {favorites.length > 0 && rest.length > 0 && (
-                  <div className="px-2 pt-2 pb-1.5">
-                    <span className="text-xs font-medium text-muted-foreground">
-                      Conversas
-                    </span>
-                  </div>
-                )}
-                <div className="flex flex-col gap-0.5">
-                  {(favorites.length > 0 ? rest : sessions).map(renderRow)}
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    </div>
-  )
+  const panel = useCallback((withToggle: boolean) => (
+    <ChatsPanel
+      favorites={sess.favorites}
+      rest={sess.rest}
+      sessions={sess.sessions}
+      withToggle={withToggle}
+      onCollapse={() => setHistoryCollapsed(true)}
+      renderRow={renderRow}
+    />
+  ), [sess, renderRow])
 
   return (
     <div ref={rootRef} className="flex h-screen overflow-hidden bg-background supports-[height:100dvh]:h-dvh">
@@ -557,7 +224,7 @@ export function Layout() {
             transition={{ duration: 0.18, ease: 'easeOut' }}
             className="flex h-full w-[260px] flex-col"
           >
-            {chatsPanel(true)}
+            {panel(true)}
           </motion.div>
         </motion.aside>
       )}
@@ -574,8 +241,8 @@ export function Layout() {
               retryLast: chat.retryLast,
               stopGenerating: chat.stopGenerating,
               sessionTitle:
-                sessions.find((s) => s.id === chat.sessionId)?.title ||
-                sessions.find((s) => s.id === chat.sessionId)?.preview ||
+                sess.sessions.find((s) => s.id === chat.sessionId)?.title ||
+                sess.sessions.find((s) => s.id === chat.sessionId)?.preview ||
                 undefined,
               openMobileNav,
             } satisfies LayoutContext
@@ -584,80 +251,12 @@ export function Layout() {
       </div>
 
       {/* Drawer mobile: coluna única — histórico em largura total */}
-      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <SheetContent
-          side="left"
-          className="flex w-[85vw] max-w-[320px] flex-col gap-0 p-0"
-        >
-          <SheetHeader className="sr-only">
-            <SheetTitle>Navegação</SheetTitle>
-          </SheetHeader>
-          <div className="flex shrink-0 items-center gap-2 border-b border-sidebar-border bg-sidebar py-2.5 pr-12 pl-3 dark:bg-[#111113]">
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-base font-bold text-primary-foreground">
-              L
-            </span>
-            <span className="min-w-0 flex-1 truncate text-sm font-semibold text-sidebar-foreground">
-              Lain
-            </span>
-            <button
-              type="button"
-              aria-label="Nova conversa"
-              title="Nova conversa"
-              onClick={() => void handleNewChat()}
-              className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-            >
-              <Plus className="size-5" weight="bold" />
-            </button>
-          </div>
-          <nav
-            aria-label="Navegação principal"
-            className="flex shrink-0 items-center gap-1 border-b border-sidebar-border bg-sidebar px-2 py-2 dark:bg-[#111113]"
-          >
-            <Link
-              to="/"
-              onClick={() => setMobileOpen(false)}
-              className={cn(
-                'flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-medium',
-                location.pathname === '/'
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                  : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-              )}
-            >
-              <ChatTeardrop className="size-4 shrink-0" weight="bold" />
-              <span className="truncate">Chat</span>
-            </Link>
-            <Link
-              to="/memorias"
-              onClick={() => setMobileOpen(false)}
-              className={cn(
-                'flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-medium',
-                location.pathname === '/memorias'
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                  : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-              )}
-            >
-              <Brain className="size-4 shrink-0" weight="regular" />
-              <span className="truncate">Memórias</span>
-            </Link>
-            <Link
-              to="/settings"
-              onClick={() => setMobileOpen(false)}
-              className={cn(
-                'flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-medium',
-                location.pathname === '/settings'
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                  : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-              )}
-            >
-              <Gear className="size-4 shrink-0" weight="bold" />
-              <span className="truncate">Ajustes</span>
-            </Link>
-          </nav>
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-sidebar dark:bg-[#111113]">
-            {chatsPanel(false)}
-          </div>
-        </SheetContent>
-      </Sheet>
+      <MobileNav
+        open={mobileOpen}
+        onOpenChange={setMobileOpen}
+        onNewChat={() => void handleNewChat()}
+        panel={panel(false)}
+      />
     </div>
   )
 }

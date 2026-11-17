@@ -102,7 +102,7 @@ export function useSessions({ activeSessionId, clearActiveSession }: SessionsDep
 
   return {
     sessions, favorites, rest, deletingId,
-    openMenuId, confirmDeleteId, setConfirmDeleteId,
+    openMenuId, setOpenMenuId, confirmDeleteId, setConfirmDeleteId,
     renamingId, renameValue, setRenameValue, setRenamingId,
     refreshSessions, patchSession, handleDeleteSession,
     startRename, saveRename, toggleMenu,
