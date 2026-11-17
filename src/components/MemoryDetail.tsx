@@ -75,9 +75,6 @@ export function MemoryDetail({ memoryId, onClose, getMemory, onVote, onForget, b
                 {data.title || (data.created ? formatDateTime(data.created) : '')}
               </DialogTitle>
             </DialogHeader>
-            <div className="text-xs text-muted-foreground mb-3">
-              {data.created ? formatDateTime(data.created) : ''}{data.project ? ` · ${data.project}` : ''}
-            </div>
             {(data.tags || []).length > 0 && (
               <div className="flex flex-wrap gap-1 mb-4">
                 {(data.tags || []).map((t: string) => (
@@ -93,11 +90,16 @@ export function MemoryDetail({ memoryId, onClose, getMemory, onVote, onForget, b
                 __html: renderWikiHtml((data.body || '').trim()),
               }}
             />
+            <div className="mt-6 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+              <span>
+                {data.created ? formatDateTime(data.created) : ''}{data.project ? ` · ${data.project}` : ''}
+              </span>
+            </div>
             {(onVote || onForget) && (() => {
               const fb = feedbackOf(data)
               const showStatus = fb.status === 'archived' || fb.confidence >= 1 || fb.kind === 'state'
               return (
-                <div className="mt-6 border-t border-border pt-4">
+                <div className="mt-3 border-t border-border pt-4">
                   {showStatus && (
                   <div className="mb-3 text-xs text-muted-foreground">
                     {fb.status === 'archived' ? (

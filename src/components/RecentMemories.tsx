@@ -1,11 +1,11 @@
 import { motion, AnimatePresence } from 'motion/react'
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Swiper, SwiperSlide } from 'swiper/react'
 import type { Swiper as SwiperType } from 'swiper'
 import { FreeMode } from 'swiper/modules'
 import 'swiper/css'
-import { CaretDown, CaretLeft, CaretRight, DotsThree, EyeSlash } from '@phosphor-icons/react'
+import { CaretDown, CaretLeft, CaretRight, DotsThree, EyeSlash, MagnifyingGlass, X } from '@phosphor-icons/react'
 import type { Memory, FeedbackAction } from '@/types'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -16,6 +16,8 @@ import { sendFeedback, forgetMemory, restoreMemory } from '@/lib/memoryApi'
 
 const HIDDEN_HOME_KEY = 'lain-hidden-home-memories'
 const COLLAPSED_HOME_KEY = 'lain-memories-home-collapsed'
+const SEARCH_PAGE_SIZE = 12
+const SEARCH_DEBOUNCE_MS = 250
 
 function loadHiddenHomeIds(): Set<string> {
   try {
@@ -53,6 +55,14 @@ export function RecentMemories() {
   const swiperRef = useRef<SwiperType | null>(null)
   const downPos = useRef<{ x: number; y: number } | null>(null)
   const navigate = useNavigate()
+  // ── Busca home (lazy: só carrega todas as memórias ao abrir) ──
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const [debounced, setDebounced] = useState('')
+  const [allMemories, setAllMemories] = useState<Memory[] | null>(null)
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [visibleCount, setVisibleCount] = useState(SEARCH_PAGE_SIZE)
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
 
   const updateEdges = useCallback((s: SwiperType) => {
     swiperRef.current = s
@@ -75,6 +85,8 @@ export function RecentMemories() {
         return tb - ta
       })
       setMemories(sorted.filter((m) => !hidden.has(m.id)).slice(0, 12))
+      // A busca da home reutiliza a mesma carga (todas, sem fatiar) — evita 2º fetch
+      setAllMemories(sorted)
     } catch {
       /* mantém lista atual */
     } finally {
@@ -91,6 +103,114 @@ export function RecentMemories() {
       alive = false
     }
   }, [reload])
+
+  // Debounce da busca para não filtrar a cada tecla
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebounced(query.trim().toLowerCase()), SEARCH_DEBOUNCE_MS)
+    return () => window.clearTimeout(t)
+  }, [query])
+
+  // Lazy: busca todas as memórias só quando a caixa abre (não pesa o load inicial da home)
+  useEffect(() => {
+    if (!searchOpen || allMemories !== null || searchLoading) return
+    let alive = true
+    setSearchLoading(true)
+    fetch('/api/vault/memories')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: Memory[]) => {
+        if (!alive) return
+        const sorted = [...(Array.isArray(data) ? data : [])].sort((a, b) => {
+          const ta = Date.parse(a.created || '')
+          const tb = Date.parse(b.created || '')
+          if (Number.isNaN(ta) && Number.isNaN(tb)) return 0
+          if (Number.isNaN(ta)) return 1
+          if (Number.isNaN(tb)) return -1
+          return tb - ta
+        })
+        setAllMemories(sorted)
+      })
+      .catch(() => {
+        if (alive) setAllMemories([])
+      })
+      .finally(() => {
+        if (alive) setSearchLoading(false)
+      })
+    return () => {
+      alive = false
+    }
+  }, [searchOpen, allMemories, searchLoading])
+
+  // Foco automático ao abrir + reseta paginação ao trocar o termo
+  useEffect(() => {
+    if (searchOpen) {
+      setVisibleCount(SEARCH_PAGE_SIZE)
+      const t = window.setTimeout(() => searchInputRef.current?.focus(), 60)
+      return () => window.clearTimeout(t)
+    }
+  }, [searchOpen])
+
+  useEffect(() => {
+    setVisibleCount(SEARCH_PAGE_SIZE)
+  }, [debounced])
+
+  const isSearching = searchOpen
+
+  const searchFiltered = useMemo(() => {
+    if (!allMemories) return []
+    if (!debounced) return allMemories
+    return allMemories.filter(
+      (m) =>
+        (m.title || '').toLowerCase().includes(debounced) ||
+        m.preview.toLowerCase().includes(debounced) ||
+        m.project.toLowerCase().includes(debounced) ||
+        (m.tags || []).some((t) => t.toLowerCase().includes(debounced))
+    )
+  }, [allMemories, debounced])
+
+  // Sync com o swiper: mesma seção, mesmos cards — só troca a fonte dos slides
+  const swiperMemories = useMemo(
+    () => (isSearching ? searchFiltered.slice(0, visibleCount) : memories),
+    [isSearching, searchFiltered, visibleCount, memories]
+  )
+  const searchTotal = searchFiltered.length
+  const searchHasMore = isSearching && searchTotal > visibleCount
+
+  // Título do header com transição animada (recent <-> all <-> results)
+  const titleMode = !isSearching ? 'recent' : debounced ? 'results' : 'all'
+  const titleLabel =
+    titleMode === 'recent'
+      ? 'Memórias recentes'
+      : titleMode === 'all'
+        ? 'Todas as memórias'
+        : `${searchTotal} resultado${searchTotal === 1 ? '' : 's'}`
+
+  const loadMoreSearch = useCallback(() => {
+    setVisibleCount((v) => v + SEARCH_PAGE_SIZE)
+  }, [])
+
+  // Ao trocar o termo, volta o carrossel pro início (sync swiper <-> busca)
+  useEffect(() => {
+    if (searchOpen) swiperRef.current?.slideTo(0, 0)
+  }, [debounced, searchOpen])
+
+  const openSearch = useCallback(() => {
+    setSearchOpen(true)
+    // busca exige lista expandida
+    setCollapsed((v) => {
+      if (!v) return v
+      try {
+        localStorage.setItem(COLLAPSED_HOME_KEY, '0')
+      } catch {}
+      return false
+    })
+  }, [])
+
+  const closeSearch = useCallback(() => {
+    setSearchOpen(false)
+    setQuery('')
+    setDebounced('')
+    setVisibleCount(SEARCH_PAGE_SIZE)
+  }, [])
 
   const getMemory = useCallback(async (id: string) => {
     try {
@@ -120,13 +240,12 @@ export function RecentMemories() {
     setBusyId(id)
     try {
       const fb = await sendFeedback(id, action)
-      setMemories((prev) =>
-        prev.map((m) =>
-          m.id === id
-            ? { ...m, confidence: fb.confidence, last_confirmed_at: fb.last_confirmed_at, status: fb.status, kind: fb.kind }
-            : m
-        )
-      )
+      const patch = (m: Memory) =>
+        m.id === id
+          ? { ...m, confidence: fb.confidence, last_confirmed_at: fb.last_confirmed_at, status: fb.status, kind: fb.kind }
+          : m
+      setMemories((prev) => prev.map(patch))
+      setAllMemories((prev) => (prev ? prev.map(patch) : prev))
       setDetailVersion((v) => v + 1)
       if (action === 'archive') {
         showUndo('Memória arquivada — fora da busca, mantida como histórico.', () => {
@@ -150,6 +269,7 @@ export function RecentMemories() {
     try {
       const { trashId, project } = await forgetMemory(id)
       setMemories((prev) => prev.filter((m) => m.id !== id))
+      setAllMemories((prev) => (prev ? prev.filter((m) => m.id !== id) : prev))
       if (selectedId === id) setSelectedId(null)
       if (trashId) {
         showUndo('Memória esquecida — não volta a ser extraída.', () => {
@@ -173,6 +293,7 @@ export function RecentMemories() {
     } catch {}
     setMenuId(null)
     setMemories((prev) => prev.filter((m) => m.id !== id))
+    setAllMemories((prev) => (prev ? prev.filter((m) => m.id !== id) : prev))
     if (selectedId === id) setSelectedId(null)
     showUndo('Memória ocultada da home.', () => {
       try {
@@ -271,8 +392,36 @@ export function RecentMemories() {
           transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
         >
       <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-0.5">
-          <h2 className="text-sm font-medium text-muted-foreground">Memórias recentes</h2>
+        <div className="flex min-w-0 items-center gap-0.5">
+          <h2 className="shrink-0 overflow-hidden text-sm font-medium text-muted-foreground">
+            <AnimatePresence mode="wait" initial={false} custom={isSearching ? 1 : -1}>
+              <motion.span
+                key={titleMode}
+                custom={isSearching ? 1 : -1}
+                variants={{
+                  enter: (d: number) => ({ opacity: 0, x: 10 * d, filter: 'blur(2px)' }),
+                  center: {
+                    opacity: 1,
+                    x: 0,
+                    filter: 'blur(0px)',
+                    transition: { duration: 0.16, ease: [0.22, 1, 0.36, 1] },
+                  },
+                  exit: (d: number) => ({
+                    opacity: 0,
+                    x: -10 * d,
+                    filter: 'blur(2px)',
+                    transition: { duration: 0.09, ease: [0.4, 0, 0.2, 1] },
+                  }),
+                }}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                className="inline-block whitespace-nowrap"
+              >
+                {titleLabel}
+              </motion.span>
+            </AnimatePresence>
+          </h2>
           <button
             type="button"
             aria-label={collapsed ? 'Expandir memórias' : 'Recolher memórias'}
@@ -290,7 +439,7 @@ export function RecentMemories() {
                 return !v
               })
             }}
-            className="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
             <motion.span
               initial={false}
@@ -301,6 +450,48 @@ export function RecentMemories() {
               <CaretDown className="size-3.5" />
             </motion.span>
           </button>
+          {/* Busca home: começa como ícone ao lado do dropdown, expande inline */}
+          {searchOpen ? (
+            <motion.div
+              key="mem-search"
+              initial={{ opacity: 0, width: 0 }}
+              animate={{ opacity: 1, width: 240 }}
+              transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+              className="flex max-w-[46vw] items-center gap-1 overflow-hidden"
+            >
+              <div className="relative w-full">
+                <MagnifyingGlass className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  ref={searchInputRef}
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') closeSearch()
+                  }}
+                  placeholder="Buscar memórias..."
+                  className="h-8 w-full rounded-md border border-border bg-background pr-3 pl-7 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none"
+                />
+              </div>
+              <button
+                type="button"
+                aria-label="Fechar busca"
+                onClick={closeSearch}
+                className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              >
+                <X className="size-3.5" />
+              </button>
+            </motion.div>
+          ) : (
+            <button
+              type="button"
+              aria-label="Buscar memórias"
+              title="Buscar memórias"
+              onClick={openSearch}
+              className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <MagnifyingGlass className="size-3.5" />
+            </button>
+          )}
         </div>
         <div className="flex items-center gap-1.5">
         <AnimatePresence initial={false}>
@@ -360,7 +551,33 @@ export function RecentMemories() {
         className="overflow-hidden"
       >
       <div className="relative">
+        {isSearching && (searchLoading || allMemories === null) ? (
+          /* Skeleton agressivo no próprio carrossel enquanto carrega todas */
+          <div className="flex gap-3 overflow-hidden" aria-hidden>
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="flex h-[148px] w-[260px] shrink-0 animate-pulse flex-col gap-2 rounded-xl bg-muted p-3.5 dark:bg-input/30"
+              >
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-3 w-1/2" />
+                <Skeleton className="h-3 w-full flex-1" />
+                <div className="flex items-center justify-between">
+                  <Skeleton className="h-3 w-24" />
+                  <Skeleton className="h-4 w-12 rounded-full" />
+                </div>
+              </div>
+            ))}
+            <div className="h-[148px] w-[260px] shrink-0 opacity-0" />
+          </div>
+        ) : isSearching && swiperMemories.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-xs text-muted-foreground">
+            Nenhuma memória encontrada{debounced ? ` para “${debounced}”` : ''}.
+          </div>
+        ) : (
+        <>
         <Swiper
+          key={searchOpen ? 'search' : 'recent'}
           modules={[FreeMode]}
           slidesPerView="auto"
           spaceBetween={12}
@@ -376,12 +593,15 @@ export function RecentMemories() {
             setShowRight(progress < 1)
           }}
           onReachBeginning={() => setShowLeft(false)}
-          onReachEnd={() => setShowRight(false)}
+          onReachEnd={() => {
+            setShowRight(false)
+            if (searchHasMore) loadMoreSearch()
+          }}
           onFromEdge={(s) => updateEdges(s)}
           onTouchStart={() => setDragging(true)}
           onTouchEnd={() => setDragging(false)}
         >
-          {memories.map((m, idx) => {
+          {swiperMemories.map((m, idx) => {
             const isSide = idx === activeIdx || idx === activeIdx + 2
             return (
             <SwiperSlide
@@ -437,27 +657,41 @@ export function RecentMemories() {
                 <div className="mb-1 truncate pr-7 text-[13px] font-semibold leading-snug text-card-foreground">
                   {m.title || formatDateTime(m.created)}
                 </div>
-                <div className="mb-1.5 text-[11px] text-muted-foreground">
-                  {formatDateTime(m.created)} · {m.project}
-                </div>
                 <div className="min-h-0 flex-1 overflow-hidden">
                   <div className="line-clamp-3 text-[13px] leading-[1.6] text-muted-foreground">
                     {m.preview}
                   </div>
                 </div>
-                {(m.tags || []).length > 0 && (
-                  <div className="mt-2 flex gap-1 overflow-hidden">
-                    {(m.tags || []).slice(0, 3).map((t) => (
-                      <Badge key={t} variant="secondary" className="px-1.5 py-0 text-[10px]">
-                        {t.replace(/^#/, '')}
-                      </Badge>
-                    ))}
+                <div className="mt-auto flex items-end justify-between gap-2 pt-2">
+                  <div className="shrink-0 text-[11px] text-muted-foreground">
+                    {formatDateTime(m.created)} · {m.project}
                   </div>
-                )}
+                  {(m.tags || []).length > 0 && (
+                    <div className="flex min-w-0 justify-end gap-1 overflow-hidden">
+                      {(m.tags || []).slice(0, 3).map((t) => (
+                        <Badge key={t} variant="secondary" className="px-1.5 py-0 text-[10px]">
+                          {t.replace(/^#/, '')}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </motion.div>
             </SwiperSlide>
             )
           })}
+          {searchHasMore && (
+            <SwiperSlide key="__more" style={{ width: 160 }}>
+              <button
+                type="button"
+                onClick={loadMoreSearch}
+                className="flex h-[148px] w-full flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-border text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              >
+                <span>Mostrar mais</span>
+                <span>({searchTotal - visibleCount})</span>
+              </button>
+            </SwiperSlide>
+          )}
         </Swiper>
         <div
           className={`pointer-events-none absolute inset-y-0 left-0 z-10 w-8 bg-gradient-to-r from-background to-transparent transition-opacity duration-300 ${dragging && showLeft ? 'opacity-100' : 'opacity-0'}`}
@@ -465,6 +699,8 @@ export function RecentMemories() {
         <div
           className={`pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-background to-transparent transition-opacity duration-300 ${dragging && showRight ? 'opacity-100' : 'opacity-0'}`}
         />
+        </>
+        )}
       </div>
       </motion.div>
 
