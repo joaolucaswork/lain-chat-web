@@ -27,7 +27,7 @@
  * Uso: bun run server/server.ts
  */
 
-import { readFileSync, existsSync, mkdirSync, readdirSync, writeFileSync, unlinkSync } from 'node:fs';
+import { readFileSync, existsSync, mkdirSync, readdirSync, writeFileSync, unlinkSync, chmodSync, renameSync } from 'node:fs';
 import { join, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
@@ -66,13 +66,12 @@ const ENV_LLM_KEY = process.env.LAIN_LLM_API_KEY
   || process.env.AI_GATEWAY_API_KEY
   || '';
 
-/** Chave efetiva: Settings (arquivo) > env. Lida a cada uso para valer sem restart. */
+/** Chave efetiva: somente ambiente; nunca persistir credenciais do provedor em disco. */
 function getLlmKey(): string {
-  return readStoredOpenRouterKey() || ENV_LLM_KEY;
+  return ENV_LLM_KEY;
 }
 
 function getLlmKeySource(): 'settings' | 'env' | 'none' {
-  if (readStoredOpenRouterKey()) return 'settings';
   if (ENV_LLM_KEY) return 'env';
   return 'none';
 }
@@ -97,25 +96,6 @@ const CHAT_RECALL_PER_PROJECT = (() => {
 })();
 const FRONTEND_DIST = process.env.FRONTEND_DIST || join(_dir, '..', 'dist');
 const SESSIONS_DIR = process.env.SESSIONS_DIR || join(_dir, 'data', 'sessions');
-const SETTINGS_FILE = process.env.SETTINGS_FILE || join(_dir, 'data', 'settings.json');
-
-// ─── Settings (OpenRouter key via UI) ───
-// A chave salva pela tela de Settings tem prioridade sobre o env.
-function readStoredOpenRouterKey(): string {
-  try {
-    if (!existsSync(SETTINGS_FILE)) return '';
-    const raw = readFileSync(SETTINGS_FILE, 'utf-8');
-    const s = JSON.parse(raw) as { openrouterKey?: unknown };
-    return typeof s.openrouterKey === 'string' ? s.openrouterKey.trim() : '';
-  } catch {
-    return '';
-  }
-}
-
-function writeStoredOpenRouterKey(key: string): void {
-  mkdirSync(dirname(SETTINGS_FILE), { recursive: true });
-  writeFileSync(SETTINGS_FILE, JSON.stringify({ openrouterKey: key }), 'utf-8');
-}
 
 function maskKey(key: string): string {
   const k = key.trim();
@@ -175,7 +155,13 @@ function persistSession(s: Session): void {
   if (!isSafeSessionId(s.id)) return;
   try {
     mkdirSync(SESSIONS_DIR, { recursive: true });
-    writeFileSync(sessionFile(s.id), JSON.stringify(s), 'utf-8');
+    chmodSync(SESSIONS_DIR, 0o700);
+    const target = sessionFile(s.id);
+    const temp = `${target}.${process.pid}.tmp`;
+    writeFileSync(temp, JSON.stringify(s), { encoding: 'utf-8', mode: 0o600 });
+    chmodSync(temp, 0o600);
+    renameSync(temp, target);
+    chmodSync(target, 0o600);
   } catch (err) {
     console.error('[bff] persist session failed:', err instanceof Error ? err.message : err);
   }
@@ -240,7 +226,21 @@ function loadSessionsFromDisk(): void {
 // ─── Helpers ───
 
 function json(data: unknown, status = 200): Response {
-  return Response.json(data, { status });
+  return withSecurityHeaders(Response.json(data, { status }));
+}
+
+const SECURITY_HEADERS: Record<string, string> = {
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Referrer-Policy': 'no-referrer',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+  'Content-Security-Policy': "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; worker-src 'self' blob:; connect-src 'self'; form-action 'self'",
+  'Strict-Transport-Security': 'max-age=31536000',
+};
+
+function withSecurityHeaders(response: Response): Response {
+  for (const [name, value] of Object.entries(SECURITY_HEADERS)) response.headers.set(name, value);
+  return response;
 }
 
 function sseMsg(event: string, data: unknown): string {
@@ -293,6 +293,11 @@ function isEmptySession(s: Session): boolean {
 }
 
 loadSessionsFromDisk();
+
+if (!MEMORY_KEY) {
+  console.error('[lain-chat-bff] fatal: LAIN_MEMORY_API_KEY is required');
+  process.exit(1);
+}
 
 async function fetchJson(url: string, body: unknown, timeoutMs = 5000): Promise<any> {
   const res = await fetch(url, {
@@ -1120,9 +1125,9 @@ Bun.serve({
     // Static: /assets/* (imutável)
     if ((req.method === 'GET' || req.method === 'HEAD') && path.startsWith('/assets/')) {
       const f = Bun.file(join(FRONTEND_DIST, path));
-      if (!(await f.exists())) return new Response('not found', { status: 404 });
+      if (!(await f.exists())) return withSecurityHeaders(new Response('not found', { status: 404 }));
       const ext = path.match(/\.(\w+)$/)?.[0] || '';
-      return new Response(f, { headers: { 'Content-Type': MIME[ext] || 'application/octet-stream', 'Cache-Control': 'public, max-age=31536000, immutable' } });
+      return withSecurityHeaders(new Response(f, { headers: { 'Content-Type': MIME[ext] || 'application/octet-stream', 'Cache-Control': 'public, max-age=31536000, immutable' } }));
     }
 
     // Static: arquivos na raiz do dist (favicon, etc.)
@@ -1130,16 +1135,16 @@ Bun.serve({
       const f = Bun.file(join(FRONTEND_DIST, path.slice(1)));
       if (await f.exists()) {
         const ext = path.match(/\.(\w+)$/)?.[0] || '';
-        return new Response(f, { headers: { 'Content-Type': MIME[ext] || 'application/octet-stream' } });
+        return withSecurityHeaders(new Response(f, { headers: { 'Content-Type': MIME[ext] || 'application/octet-stream' } }));
       }
       // SPA fallback p/ React Router (/memorias, /sobre)
       const html = existsSync(UI_PATH) ? readFileSync(UI_PATH, 'utf-8') : UI_FALLBACK;
-      return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' } });
+      return withSecurityHeaders(new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' } }));
     }
 
     if (req.method === 'GET' && path === '/') {
       const html = existsSync(UI_PATH) ? readFileSync(UI_PATH, 'utf-8') : UI_FALLBACK;
-      return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' } });
+      return withSecurityHeaders(new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' } }));
     }
 
     // ── SSE ──
@@ -1165,7 +1170,7 @@ Bun.serve({
           clearInterval((ctrl as any)._keepalive);
         },
       });
-      return new Response(stream, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' } });
+      return withSecurityHeaders(new Response(stream, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' } }));
     }
 
     // ── Send message ──
@@ -1394,7 +1399,14 @@ Bun.serve({
       }
       const kind = body.kind === 'state' || body.kind === 'fact' ? body.kind : undefined;
       try {
-        const fb = await fetchJson(`${MEMORY_URL}/api/memory/feedback`, { id, action, ...(kind ? { kind } : {}) }, 10_000);
+        const found = (await listVaultMemories()).find(m => m.id === id);
+        if (!found) return json({ error: 'not found' }, 404);
+        const fb = await fetchJson(`${MEMORY_URL}/api/memory/feedback`, {
+          id,
+          project: found.project || 'global',
+          action,
+          ...(kind ? { kind } : {}),
+        }, 10_000);
         return json(fb);
       } catch {
         return json({ error: 'lain-memory unavailable' }, 502);
@@ -1407,8 +1419,11 @@ Bun.serve({
       try {
         const all = await listVaultMemories();
         const found = all.find(m => m.id === id);
-        const scope = found && found.project !== 'global' ? { project: found.project } : {};
-        const res = await fetchJson(`${MEMORY_URL}/api/memory/forget`, { memory_id: id, ...scope }, 10_000);
+        if (!found) return json({ error: 'not found' }, 404);
+        const res = await fetchJson(`${MEMORY_URL}/api/memory/forget`, {
+          memory_id: id,
+          project: found.project || 'global',
+        }, 10_000);
         return json(res);
       } catch {
         return json({ error: 'lain-memory unavailable' }, 502);
@@ -1423,7 +1438,11 @@ Bun.serve({
         return json({ error: 'trash_id required' }, 400);
       }
       try {
-        const res = await fetchJson(`${MEMORY_URL}/api/memory/restore`, { memory_id: body.trash_id }, 10_000);
+        const project = typeof body.project === 'string' && body.project.trim() ? body.project.trim() : undefined;
+        const res = await fetchJson(`${MEMORY_URL}/api/memory/restore`, {
+          memory_id: body.trash_id,
+          ...(project ? { project } : {}),
+        }, 10_000);
         return json(res);
       } catch {
         return json({ error: 'lain-memory unavailable' }, 502);
@@ -1458,37 +1477,21 @@ Bun.serve({
 
     // ── Settings: OpenRouter key ──
     if (req.method === 'GET' && path === '/api/settings') {
-      const stored = readStoredOpenRouterKey();
       const source = getLlmKeySource();
       return json({
         hasKey: getLlmKey() !== '',
         source,
-        masked: stored ? maskKey(stored) : (ENV_LLM_KEY ? maskKey(ENV_LLM_KEY) : ''),
+        masked: ENV_LLM_KEY ? maskKey(ENV_LLM_KEY) : '',
         fromEnv: Boolean(ENV_LLM_KEY),
       });
     }
 
     if (req.method === 'POST' && path === '/api/settings/openrouter-key') {
-      let body: Record<string, unknown>;
-      try { body = await req.json(); } catch { return json({ error: 'Invalid JSON' }, 400); }
-      const key = typeof body.key === 'string' ? body.key.trim() : '';
-      if (!key) return json({ error: 'Chave é obrigatória' }, 400);
-      if (key.length < 8) return json({ error: 'Chave inválida (curta demais)' }, 400);
-      try {
-        writeStoredOpenRouterKey(key);
-      } catch (err) {
-        return json({ error: 'Falha ao salvar a chave' }, 500);
-      }
-      return json({ ok: true, hasKey: true, source: 'settings', masked: maskKey(key) });
+      return json({ error: 'A chave é configurada no ambiente do servidor' }, 410);
     }
 
     if (req.method === 'DELETE' && path === '/api/settings/openrouter-key') {
-      try {
-        writeStoredOpenRouterKey('');
-      } catch {
-        return json({ error: 'Falha ao remover a chave' }, 500);
-      }
-      return json({ ok: true, hasKey: getLlmKey() !== '', source: getLlmKeySource() });
+      return json({ error: 'A chave é configurada no ambiente do servidor' }, 410);
     }
 
     return json({ error: `unknown route: ${path}` }, 404);

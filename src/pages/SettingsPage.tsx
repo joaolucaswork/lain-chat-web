@@ -1,9 +1,7 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { List } from '@phosphor-icons/react'
 import type { LayoutContext } from './Layout'
-import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
 import {
   Select,
   SelectContent,
@@ -15,24 +13,17 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { OpenRouterLogo } from '@/components/OpenRouterLogo'
 import { useTheme } from '@/hooks/useTheme'
 import { Moon, Sun } from '@phosphor-icons/react'
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
 import { useModel } from '@/hooks/useModel'
 
 interface SettingsStatus {
   hasKey: boolean
-  source: 'settings' | 'env' | 'none'
+  source: 'env' | 'none'
   masked: string
   fromEnv: boolean
 }
@@ -40,13 +31,6 @@ interface SettingsStatus {
 export function SettingsPage() {
   const { openMobileNav } = useOutletContext<LayoutContext>()
   const [status, setStatus] = useState<SettingsStatus | null>(null)
-  const [key, setKey] = useState('')
-  const [show, setShow] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [removing, setRemoving] = useState(false)
-  const [error, setError] = useState('')
-  const [saved, setSaved] = useState(false)
-  const [editOpen, setEditOpen] = useState(false)
   const { model, setModel, models } = useModel()
   const { dark, toggle } = useTheme()
 
@@ -60,55 +44,6 @@ export function SettingsPage() {
   useEffect(() => {
     load()
   }, [])
-
-  const handleSave = async (e: FormEvent) => {
-    e.preventDefault()
-    const trimmed = key.trim()
-    if (!trimmed) {
-      setError('Cole sua chave do OpenRouter.')
-      return
-    }
-    setSaving(true)
-    setError('')
-    setSaved(false)
-    try {
-      const res = await fetch('/api/settings/openrouter-key', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: trimmed }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.error || 'Falha ao salvar')
-      setKey('')
-      setSaved(true)
-      setEditOpen(false)
-      setStatus({
-        hasKey: true,
-        source: 'settings',
-        masked: data.masked || '',
-        fromEnv: status?.fromEnv ?? false,
-      })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Falha ao salvar')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleRemove = async () => {
-    setRemoving(true)
-    setError('')
-    setSaved(false)
-    try {
-      const res = await fetch('/api/settings/openrouter-key', { method: 'DELETE' })
-      if (!res.ok) throw new Error('Falha ao remover')
-      await load()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Falha ao remover')
-    } finally {
-      setRemoving(false)
-    }
-  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -169,147 +104,27 @@ export function SettingsPage() {
             </CardContent>
           </Card>
 
-          {status?.hasKey && (
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <OpenRouterLogo className="h-4 w-auto shrink-0 text-foreground" />
-                    Chave ativa
-                  </CardTitle>
-                  <Badge variant="secondary">Ativa</Badge>
-                </div>
-                <CardDescription>
-                  Chave do OpenRouter em uso pelo chat.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-1">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>OpenRouter</CardTitle>
+                {status?.hasKey && <Badge variant="secondary">Ativa</Badge>}
+              </div>
+              <CardDescription>
+                A chave é carregada do ambiente do servidor e não fica armazenada na aplicação.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {status?.hasKey ? (
                 <p className="font-mono text-sm">{status.masked}</p>
-                <a
-                  href="https://openrouter.ai/"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-xs text-muted-foreground underline-offset-4 hover:underline"
-                >
-                  openrouter.ai
-                </a>
-              </CardContent>
-              <CardFooter className="gap-2">
-                <Popover
-                  open={editOpen}
-                  onOpenChange={(open) => {
-                    setEditOpen(open)
-                    if (open) {
-                      setError('')
-                      setSaved(false)
-                    } else {
-                      setKey('')
-                    }
-                  }}
-                >
-                  <PopoverTrigger asChild>
-                    <Button type="button" size="sm" variant="outline">
-                      Editar
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-80" align="start">
-                    <form onSubmit={handleSave} className="space-y-3">
-                      <p className="text-sm font-semibold">Trocar chave</p>
-                      <Input
-                        type={show ? 'text' : 'password'}
-                        placeholder="sk-or-v1-..."
-                        value={key}
-                        onChange={(e) => setKey(e.target.value)}
-                        autoComplete="off"
-                        spellCheck={false}
-                      />
-                      {error && <p className="text-xs text-destructive">{error}</p>}
-                      <div className="flex items-center gap-2">
-                        <Button type="submit" size="sm" variant="outline" disabled={saving}>
-                          {saving ? 'Salvando...' : 'Salvar chave'}
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setShow((v) => !v)}
-                        >
-                          {show ? 'Ocultar' : 'Mostrar'}
-                        </Button>
-                      </div>
-                      <div className="border-t border-border pt-3">
-                        <p className="text-xs text-muted-foreground">
-                          Pegue sua api key:{' '}
-                          <a
-                            href="https://openrouter.ai/"
-                            target="_blank"
-                            rel="noreferrer"
-                            className="underline-offset-4 hover:underline"
-                          >
-                            openrouter.ai
-                          </a>
-                        </p>
-                      </div>
-                    </form>
-                  </PopoverContent>
-                </Popover>
-                {status.source === 'settings' && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    disabled={removing}
-                    onClick={handleRemove}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    {removing ? 'Removendo...' : 'Remover chave'}
-                  </Button>
-                )}
-              </CardFooter>
-            </Card>
-          )}
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Configure <code>LAIN_LLM_API_KEY</code> ou <code>OPENROUTER_API_KEY</code> no arquivo de ambiente do servidor.
+                </p>
+              )}
+            </CardContent>
+          </Card>
 
-          {!status?.hasKey && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Definir chave</CardTitle>
-                <CardDescription>
-                  Salva no servidor e tem prioridade sobre a chave do ambiente.
-                </CardDescription>
-              </CardHeader>
-              <form onSubmit={handleSave}>
-                <CardContent className="space-y-3">
-                  <Input
-                    type={show ? 'text' : 'password'}
-                    placeholder="sk-or-v1-..."
-                    value={key}
-                    onChange={(e) => setKey(e.target.value)}
-                    autoComplete="off"
-                    spellCheck={false}
-                  />
-                  {error && <p className="text-xs text-destructive">{error}</p>}
-                  {saved && !error && (
-                    <p className="text-xs text-muted-foreground">
-                      Chave salva com sucesso.
-                    </p>
-                  )}
-                </CardContent>
-                <CardFooter className="gap-2">
-                  <Button type="submit" size="sm" variant="outline" disabled={saving}>
-                    {saving ? 'Salvando...' : 'Salvar chave'}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setShow((v) => !v)}
-                  >
-                    {show ? 'Ocultar' : 'Mostrar'}
-                  </Button>
-                </CardFooter>
-              </form>
-            </Card>
-          )}
         </div>
       </div>
     </div>
