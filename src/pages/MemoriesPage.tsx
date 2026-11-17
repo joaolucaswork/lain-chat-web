@@ -86,11 +86,11 @@ export function MemoriesPage() {
   const handleForget = useCallback(async (id: string) => {
     setBusyId(id)
     try {
-      const { trashId } = await forget(id)
+      const { trashId, project } = await forget(id)
       if (selectedMemoryId === id) setSelectedMemoryId(null)
       if (trashId) {
         showUndo('Memória esquecida — não volta a ser extraída.', () => {
-          restore(trashId).catch(() => {})
+          restore(trashId, project).catch(() => {})
         })
       }
     } catch {

@@ -24,14 +24,14 @@ export function sendFeedback(id: string, action: FeedbackAction, kind?: MemoryKi
 export function forgetMemory(id: string) {
   return fetch(`/api/vault/memory/${encodeURIComponent(id)}`, {
     method: 'DELETE',
-  }).then(parseJson) as Promise<{ success: boolean; trashId: string | null; blocked: boolean }>
+  }).then(parseJson) as Promise<{ success: boolean; trashId: string | null; blocked: boolean; project: string }>
 }
 
 /** Undo do ✕. */
-export function restoreMemory(trashId: string) {
+export function restoreMemory(trashId: string, project: string) {
   return fetch('/api/vault/restore', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ trash_id: trashId }),
+    body: JSON.stringify({ trash_id: trashId, project }),
   }).then(parseJson) as Promise<{ success: boolean; id: string }>
 }

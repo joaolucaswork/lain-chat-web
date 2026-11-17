@@ -73,8 +73,8 @@ export function useMemories() {
     return { ...res, removed }
   }, [])
 
-  const restore = useCallback(async (trashId: string) => {
-    const res = await restoreMemory(trashId)
+  const restore = useCallback(async (trashId: string, project: string) => {
+    const res = await restoreMemory(trashId, project)
     await load()
     return res
   }, [load])

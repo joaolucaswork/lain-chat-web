@@ -148,12 +148,12 @@ export function RecentMemories() {
   const handleForget = useCallback(async (id: string) => {
     setBusyId(id)
     try {
-      const { trashId } = await forgetMemory(id)
+      const { trashId, project } = await forgetMemory(id)
       setMemories((prev) => prev.filter((m) => m.id !== id))
       if (selectedId === id) setSelectedId(null)
       if (trashId) {
         showUndo('Memória esquecida — não volta a ser extraída.', () => {
-          restoreMemory(trashId)
+          restoreMemory(trashId, project)
             .then(() => reload())
             .catch(() => {})
         })
