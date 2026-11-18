@@ -105,7 +105,7 @@ export function TenantSettingsPage() {
                   placeholder="Seu nome (ex: ana)"
                   maxLength={40}
                   autoComplete="nickname"
-                  className="w-full rounded-lg border border-input bg-background px-4 py-2.5 outline-none focus:border-primary"
+                  className="w-full rounded-lg border border-input bg-background px-4 py-2.5 outline-none focus:border-foreground"
                 />
                 {error && <p className="text-sm text-destructive">{error}</p>}
                 {info && <p className="text-sm text-muted-foreground">{info}</p>}
