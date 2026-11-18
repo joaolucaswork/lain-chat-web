@@ -112,7 +112,7 @@ export function TenantSettingsPage() {
                 <button
                   type="submit"
                   disabled={busy || name.trim() === (savedName ?? '')}
-                  className="w-full rounded-lg bg-primary px-4 py-2.5 font-medium text-primary-foreground disabled:opacity-40"
+                  className="rounded-lg bg-foreground px-4 py-1.5 text-base font-medium text-background disabled:opacity-40"
                 >
                   {busy ? 'Salvando…' : 'Salvar nome'}
                 </button>
