@@ -4,7 +4,9 @@
  * POST /api/tenant/signup {name} → cria o tenant no lain-memory, grava a key
  *   num cookie HttpOnly e devolve {tenant}. Nome duplicado → 409 (a UI pede outro).
  * POST /api/tenant/logout → limpa o cookie (sessões ficam órfãs no disco do dono).
- * DELETE /api/tenant/data → wipe total no lain-memory (LGPD) + limpa o cookie.
+ * DELETE /api/tenant/account → exclusão total (LGPD): dados + registro do
+ *   tenant no upstream, usuário no Supabase Auth, sessões/profile locais.
+ *   O nome é liberado e o cookie é limpo. Sem undo.
  * POST /api/tenant/mcp-token → emite um token MCP dedicado (upstream minta e
  *   gira o anel; a sessão cookie continua válida). Devolve {apiKey} UMA vez —
  *   o frontend mostra para copiar no client MCP (opencode/Claude Desktop).
@@ -120,25 +122,40 @@ export async function handleTenant(req: Request, path: string): Promise<Response
     return res;
   }
 
-  // ── Wipe total (LGPD): memórias + grafo + blocklist do tenant + transcripts ──
-  if (req.method === 'DELETE' && path === '/api/tenant/data') {
+  // ── Exclusão total da conta (LGPD): dados + registro no upstream, usuário
+  // no Supabase Auth, sessões + perfil locais. O nome é liberado (um novo
+  // signup pode reutilizá-lo) e o cookie é limpo. Sem undo.
+  if (req.method === 'DELETE' && path === '/api/tenant/account') {
     const key = tenantKeyFromCookie(req);
     if (!key) return json({ error: 'no tenant session' }, 401);
     try {
-      const res = await fetch(`${MEMORY_URL}/api/tenant/data`, {
+      const res = await fetch(`${MEMORY_URL}/api/tenant/account`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${key}` },
-        signal: AbortSignal.timeout(30_000),
+        signal: AbortSignal.timeout(60_000),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) return json({ error: 'wipe failed' }, 502);
+      const data = (await res.json().catch(() => null)) as { sub?: unknown } | null;
+      if (!res.ok) return json({ error: 'account delete failed' }, 502);
+      // O registro foi purgado e a key morreu — o sub veio no corpo, é a
+      // única chance de excluir o usuário no Auth. Falha aqui não reverte
+      // os dados (já eliminados): loga e segue — um re-login criaria um
+      // tenant zerado, estado final equivalente à exclusão total.
+      const sub = typeof data?.sub === 'string' ? data.sub : '';
+      if (sub) {
+        try {
+          const { deleteSupabaseUser } = await import('../lib/supabase.ts');
+          await deleteSupabaseUser(sub);
+        } catch (err) {
+          console.error('[bff] supabase user delete failed:', err instanceof Error ? err.message : err);
+        }
+      }
       // Transcripts saem junto (mesmo dono estável) — sem órfãos no disco.
       const { deleteOwnerSessions } = await import('../lib/sessions.ts');
       const wipedSessions = deleteOwnerSessions(await resolveOwner(req));
-      // Perfil (nome) é PII: sai junto no wipe.
+      // Perfil (nome) é PII: sai junto na exclusão.
       const { deleteTenantProfile } = await import('../lib/profile.ts');
       deleteTenantProfile(await resolveOwner(req));
-      const out = json({ ok: true, ...data, wipedSessions });
+      const out = json({ ok: true, wipedSessions });
       out.headers.set('Set-Cookie', tenantCookieClear());
       return out;
     } catch {

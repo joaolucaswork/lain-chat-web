@@ -105,10 +105,10 @@ export function TenantSettingsPage() {
   const hint = 'pt-0.5 text-sm text-muted-foreground'
 
   /**
-   * Wipe LGPD: memórias + grafo + conversas do visitante. A conta continua —
-   * entrar de novo começa do zero. Sem undo. O modal exige digitar APAGAR
-   * (padrão GitHub/Vercell para ação destrutiva; funciona igual para login
-   * com senha e com Google, sem bifurcar o fluxo por provedor).
+   * Exclusão total da conta (LGPD): dados + registro do tenant + usuário no
+   * Supabase Auth. O nome é liberado. Sem undo. O modal exige digitar APAGAR
+   * (padrão GitHub/Vercel para ação destrutiva; via única para login com
+   * senha e com Google).
    */
   function openWipe() {
     setWipeConfirm('')
@@ -121,7 +121,7 @@ export function TenantSettingsPage() {
     setWipeBusy(true)
     setWipeError('')
     try {
-      const res = await fetch('/api/tenant/data', { method: 'DELETE' })
+      const res = await fetch('/api/tenant/account', { method: 'DELETE' })
       if (!res.ok) {
         setWipeError('Não foi possível apagar. Tente de novo.')
         setWipeBusy(false)
@@ -237,9 +237,9 @@ export function TenantSettingsPage() {
             <div className="overflow-hidden rounded-xl border border-border bg-card">
               <div className={row}>
                 <div>
-                  <p className={label}>Apagar meus dados</p>
+                  <p className={label}>Excluir minha conta</p>
                   <p className={`${hint} leading-relaxed`}>
-                    Remove memórias, grafo e conversas. Sua conta continua ativa.
+                    Remove seus dados e exclui sua conta. Sem volta.
                   </p>
                 </div>
                 <div className="flex w-64 shrink-0 items-center justify-end">
@@ -248,7 +248,7 @@ export function TenantSettingsPage() {
                     onClick={openWipe}
                     className="rounded-lg border border-destructive/40 px-3 py-1.5 text-sm font-medium text-destructive hover:bg-destructive/10"
                   >
-                    Apagar tudo
+                    Excluir conta
                   </button>
                 </div>
               </div>
@@ -266,10 +266,10 @@ export function TenantSettingsPage() {
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Apagar meus dados</DialogTitle>
+            <DialogTitle>Excluir minha conta</DialogTitle>
             <DialogDescription>
-              Isso remove suas memórias, grafo e conversas do servidor. Sua conta continua — entrar
-              de novo começa do zero. Não tem como desfazer.
+              Isso apaga suas memórias, grafo e conversas e exclui sua conta permanentemente.
+              Não tem como desfazer.
             </DialogDescription>
           </DialogHeader>
           <form
@@ -311,7 +311,7 @@ export function TenantSettingsPage() {
                 disabled={wipeBusy || !wipeReady}
                 className="rounded-lg bg-destructive px-3 py-1.5 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-40"
               >
-                {wipeBusy ? 'Apagando…' : 'Apagar tudo'}
+                {wipeBusy ? 'Excluindo…' : 'Excluir conta'}
               </button>
             </DialogFooter>
           </form>

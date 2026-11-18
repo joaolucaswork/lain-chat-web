@@ -35,3 +35,15 @@ export async function getSupabaseUser(accessToken: string): Promise<Pick<User, '
   if (error || !data?.user) throw new Error(error?.message ?? 'invalid token');
   return { id: data.user.id, email: data.user.email ?? undefined };
 }
+
+/**
+ * Exclui o usuário no Supabase Auth (exclusão total da conta). Admin key.
+ * Throw em qualquer falha — o caller decide o fallback.
+ */
+export async function deleteSupabaseUser(sub: string): Promise<void> {
+  const id = (sub ?? '').trim();
+  if (!id) throw new Error('sub is required');
+  if (!isSupabaseConfigured()) throw new Error('auth not configured');
+  const { error } = await adminClient().auth.admin.deleteUser(id);
+  if (error) throw new Error(error.message);
+}

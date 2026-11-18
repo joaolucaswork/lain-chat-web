@@ -8,7 +8,7 @@ import { clearTenantName, getTenantName, useMeMode } from '@/hooks/useMe'
  *
  * "Sair" = só encerra a sessão (cookie + Supabase). Os dados ficam — ao
  * entrar de novo, tudo está lá (a key do tenant rotaciona no login).
- * O wipe LGPD ("Apagar tudo") mora em /settings/conta, seção Dados.
+ * A exclusão total ("Excluir conta") mora em /settings/conta, seção Dados.
  */
 export function TenantExitButton({ compact }: { compact?: boolean }) {
   const [busy, setBusy] = useState<null | 'logout'>(null)
