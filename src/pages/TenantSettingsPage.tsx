@@ -174,7 +174,7 @@ export function TenantSettingsPage() {
         <div className="mx-auto max-w-4xl space-y-6 px-4 py-6">
           <div>
             <h1 className="text-2xl font-bold">Preferências</h1>
-            <p className="pt-1 text-[15px] text-muted-foreground">
+            <p className="pt-2 text-[15px] text-muted-foreground">
               Gerencie seu perfil e a aparência do app.
             </p>
           </div>
