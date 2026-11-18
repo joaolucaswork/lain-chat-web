@@ -2,19 +2,14 @@ import { useEffect, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { List } from '@phosphor-icons/react'
 import type { LayoutContext } from './Layout'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
 import { useTheme } from '@/hooks/useTheme'
 import { getTenantName, setTenantName } from '@/hooks/useMe'
+import { supabase } from '@/lib/supabase'
 import { Moon, Sun } from '@phosphor-icons/react'
 
 /**
- * Ajustes do visitante (demo): tema + nome.
+ * Conta do visitante (demo): perfil + aparência.
+ * Nome editável (o agente usa na conversa); email só leitura (login).
  * Modelo e OpenRouter ficam de fora de propósito — o BFF trava o modelo
  * barato para tenants e a trava real é no server (effectiveModel).
  */
@@ -23,6 +18,7 @@ export function TenantSettingsPage() {
   const { dark, toggle } = useTheme()
   const [name, setName] = useState(() => getTenantName() ?? '')
   const [savedName, setSavedName] = useState<string | null>(null)
+  const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
@@ -35,6 +31,14 @@ export function TenantSettingsPage() {
         if (!alive || typeof d?.name !== 'string') return
         setName(d.name)
         setTenantName(d.name)
+      })
+      .catch(() => {})
+    supabase()
+      ?.auth.getSession()
+      .then(({ data }) => {
+        if (!alive) return
+        const mail = data.session?.user.email
+        if (mail) setEmail(mail)
       })
       .catch(() => {})
     return () => {
@@ -74,6 +78,10 @@ export function TenantSettingsPage() {
     }
   }
 
+  const row = 'flex items-center justify-between gap-6 border-b border-border px-6 py-4 last:border-b-0'
+  const label = 'text-[15px] text-foreground'
+  const hint = 'pt-0.5 text-sm text-muted-foreground'
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 items-center gap-3 border-b border-border bg-card px-4 py-2">
@@ -89,56 +97,77 @@ export function TenantSettingsPage() {
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-md space-y-4 px-4 py-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Como posso te chamar?</CardTitle>
-              <CardDescription>
-                O agente usa esse nome na conversa. Vale na hora, sem perder nada.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={(e) => void save(e)} className="space-y-3">
+        <div className="mx-auto max-w-2xl space-y-8 px-4 py-6">
+          <div>
+            <h1 className="text-2xl font-bold">Preferências</h1>
+            <p className="pt-1 text-[15px] text-muted-foreground">
+              Gerencie seu perfil e a aparência do app.
+            </p>
+          </div>
+
+          <section>
+            <h2 className="pb-3 text-lg font-bold">Informações do perfil</h2>
+            <form
+              onSubmit={(e) => void save(e)}
+              className="overflow-hidden rounded-xl border border-border bg-card"
+            >
+              <div className={row}>
+                <div>
+                  <p className={label}>Nome</p>
+                  <p className={hint}>Como o agente te chama</p>
+                </div>
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Seu nome (ex: ana)"
+                  placeholder="Seu nome"
                   maxLength={40}
                   autoComplete="nickname"
-                  className="w-full rounded-lg border border-input bg-background px-4 py-2.5 outline-none focus:border-foreground"
+                  className="w-64 rounded-lg border border-input bg-background px-4 py-2 outline-none focus:border-foreground"
                 />
-                {error && <p className="text-sm text-destructive">{error}</p>}
-                {info && <p className="text-sm text-muted-foreground">{info}</p>}
+              </div>
+              <div className={row}>
+                <div>
+                  <p className={label}>E-mail principal</p>
+                  <p className={hint}>Usado para login</p>
+                </div>
+                <p className="w-64 truncate rounded-lg border border-input bg-muted px-4 py-2 text-muted-foreground">
+                  {email || '…'}
+                </p>
+              </div>
+              <div className="flex items-center justify-end gap-3 px-6 py-4">
+                {error && <p className="mr-auto text-sm text-destructive">{error}</p>}
+                {info && !error && <p className="mr-auto text-sm text-muted-foreground">{info}</p>}
                 <button
                   type="submit"
                   disabled={busy || name.trim() === (savedName ?? '')}
                   className="rounded-lg bg-foreground px-3 py-1 text-sm font-normal text-background disabled:opacity-40"
                 >
-                  {busy ? 'Salvando…' : 'Salvar nome'}
+                  {busy ? 'Salvando…' : 'Salvar'}
                 </button>
-              </form>
-            </CardContent>
-          </Card>
+              </div>
+            </form>
+          </section>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Aparência</CardTitle>
-              <CardDescription>
-                Alterna entre o tema claro e o escuro.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <button
-                type="button"
-                onClick={toggle}
-                aria-label={dark ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
-                className="flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-left hover:bg-accent"
-              >
-                {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
-                <span className="text-sm">{dark ? 'Escuro' : 'Claro'}</span>
-              </button>
-            </CardContent>
-          </Card>
+          <section>
+            <h2 className="pb-3 text-lg font-bold">Aparência</h2>
+            <div className="overflow-hidden rounded-xl border border-border bg-card">
+              <div className={row}>
+                <div>
+                  <p className={label}>Tema</p>
+                  <p className={hint}>{dark ? 'Escuro' : 'Claro'}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={toggle}
+                  aria-label={dark ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
+                  className="flex w-64 items-center gap-3 rounded-lg border border-input px-4 py-2 hover:bg-accent"
+                >
+                  {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
+                  <span className="text-[15px]">{dark ? 'Escuro' : 'Claro'}</span>
+                </button>
+              </div>
+            </div>
+          </section>
         </div>
       </div>
     </div>
