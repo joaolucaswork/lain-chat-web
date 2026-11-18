@@ -3,7 +3,7 @@ import { useOutletContext } from 'react-router-dom'
 import { List } from '@phosphor-icons/react'
 import type { LayoutContext } from './Layout'
 import { useTheme, type ThemeMode } from '@/hooks/useTheme'
-import { getTenantName, setTenantName } from '@/hooks/useMe'
+import { getTenantName, setTenantName, clearTenantName } from '@/hooks/useMe'
 import { supabase } from '@/lib/supabase'
 import {
   Select,
@@ -28,6 +28,9 @@ export function TenantSettingsPage() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
+  const [wipeArmed, setWipeArmed] = useState(false)
+  const [wipeBusy, setWipeBusy] = useState(false)
+  const [wipeError, setWipeError] = useState('')
 
   useEffect(() => {
     let alive = true
@@ -87,6 +90,46 @@ export function TenantSettingsPage() {
   const row = 'flex items-center justify-between gap-6 border-b border-border px-6 py-4 last:border-b-0'
   const label = 'text-[15px] text-foreground'
   const hint = 'pt-0.5 text-sm text-muted-foreground'
+
+  /**
+   * Wipe LGPD: memórias + grafo + conversas do visitante. A conta continua —
+   * entrar de novo começa do zero. Sem undo. Dois toques para confirmar.
+   */
+  async function wipe() {
+    if (wipeBusy) return
+    if (!wipeArmed) {
+      setWipeArmed(true)
+      return
+    }
+    setWipeBusy(true)
+    setWipeError('')
+    let failed = false
+    try {
+      const res = await fetch('/api/tenant/data', { method: 'DELETE' })
+      if (!res.ok) {
+        setWipeError('Não foi possível apagar. Tente de novo.')
+        failed = true
+      }
+    } catch {
+      setWipeError('Sem conexão com o servidor. Tente de novo.')
+      failed = true
+    }
+    if (failed) {
+      setWipeBusy(false)
+      return
+    }
+    try {
+      await fetch('/api/tenant/logout', { method: 'POST' })
+    } catch {}
+    try {
+      await supabase()?.auth.signOut()
+    } catch {}
+    clearTenantName()
+    try {
+      sessionStorage.clear()
+    } catch {}
+    window.location.href = '/'
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -171,6 +214,48 @@ export function TenantSettingsPage() {
                     <SelectItem value="dark">Escuro</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <h2 className="pb-3 text-lg font-bold">Dados</h2>
+            <div className="overflow-hidden rounded-xl border border-border bg-card">
+              <div className={row}>
+                <div>
+                  <p className={label}>Apagar meus dados</p>
+                  <p className={hint}>
+                    Remove memórias, grafo e conversas. Sua conta continua — entrar de novo começa
+                    do zero. Não tem como desfazer.
+                  </p>
+                  {wipeError && <p className="pt-1 text-sm text-destructive">{wipeError}</p>}
+                </div>
+                <div className="flex w-64 shrink-0 items-center justify-end gap-2">
+                  {wipeArmed && !wipeBusy && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setWipeArmed(false)
+                        setWipeError('')
+                      }}
+                      className="rounded-lg px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent"
+                    >
+                      Cancelar
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => void wipe()}
+                    disabled={wipeBusy}
+                    className={
+                      wipeArmed
+                        ? 'rounded-lg bg-destructive px-3 py-1.5 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-40'
+                        : 'rounded-lg border border-destructive/40 px-3 py-1.5 text-sm font-medium text-destructive hover:bg-destructive/10 disabled:opacity-40'
+                    }
+                  >
+                    {wipeBusy ? 'Apagando…' : wipeArmed ? 'Sim, apagar tudo' : 'Apagar tudo'}
+                  </button>
+                </div>
               </div>
             </div>
           </section>
