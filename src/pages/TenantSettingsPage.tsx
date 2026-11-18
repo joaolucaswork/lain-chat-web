@@ -121,7 +121,7 @@ export function TenantSettingsPage() {
                   placeholder="Seu nome"
                   maxLength={40}
                   autoComplete="nickname"
-                  className="w-64 rounded-lg border border-border/60 bg-background px-4 py-2 outline-none focus:border-muted-foreground"
+                  className="w-64 rounded-lg border border-border/60 bg-background px-4 py-2 text-[13px] outline-none focus:border-muted-foreground"
                 />
               </div>
               <div className={row}>
@@ -129,7 +129,7 @@ export function TenantSettingsPage() {
                   <p className="text-[13px] text-foreground">E-mail principal</p>
                   <p className={hint}>Usado para login</p>
                 </div>
-                <p className="w-64 truncate rounded-lg border border-border/60 bg-muted px-4 py-2 text-muted-foreground">
+                <p className="w-64 truncate rounded-lg border border-border/60 bg-muted px-4 py-2 text-[13px] text-muted-foreground">
                   {email || '…'}
                 </p>
               </div>
