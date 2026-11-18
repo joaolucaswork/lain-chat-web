@@ -53,9 +53,12 @@ export function MobileNav({ open, onOpenChange, onNewChat, panel }: MobileNavPro
           <MobileLink to="/" label="Chat" icon="chat" active={location.pathname === '/'} onClick={close} />
           <MobileLink to="/memorias" label="Memórias" icon="brain" active={location.pathname === '/memorias'} onClick={close} />
           {isTenant ? (
-            <div className="flex min-w-0 flex-1" onClick={close}>
-              <TenantExitButton />
-            </div>
+            <>
+              <MobileLink to="/settings/conta" label="Ajustes" icon="gear" active={location.pathname.startsWith('/settings')} onClick={close} />
+              <div className="flex min-w-0 flex-1" onClick={close}>
+                <TenantExitButton />
+              </div>
+            </>
           ) : (
             <MobileLink to="/settings" label="Ajustes" icon="gear" active={location.pathname === '/settings'} onClick={close} />
           )}

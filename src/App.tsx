@@ -16,6 +16,9 @@ const MemoriesPage = lazy(() =>
 const SettingsPage = lazy(() =>
   import('@/pages/SettingsPage').then((m) => ({ default: m.SettingsPage })),
 )
+const TenantSettingsPage = lazy(() =>
+  import('@/pages/TenantSettingsPage').then((m) => ({ default: m.TenantSettingsPage })),
+)
 
 function DemoGate({ children }: { children: React.ReactNode }) {
   const mode = useMe()
@@ -63,6 +66,14 @@ export default function App() {
                   </Suspense>
                 }
               />
+              <Route
+                path="/settings/conta"
+                element={
+                  <Suspense fallback={<RouteFallback variant="settings" />}>
+                    <TenantAccountGuard />
+                  </Suspense>
+                }
+              />
             </Route>
           </Routes>
         </DemoGate>
@@ -76,4 +87,11 @@ function TenantSettingsGuard() {
   const mode = useMeMode()
   if (mode === 'tenant' || getTenantName()) return <Navigate to="/" replace />
   return <SettingsPage />
+}
+
+/** Conta do visitante: tema + nome. Owner usa o /settings completo. */
+function TenantAccountGuard() {
+  const mode = useMeMode()
+  if (mode === 'tenant' || getTenantName()) return <TenantSettingsPage />
+  return <Navigate to="/settings" replace />
 }

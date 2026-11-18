@@ -226,7 +226,16 @@ export function Layout() {
         <div className="flex-1" />
 
         {isTenant ? (
-          <TenantExitButton compact />
+          <>
+            <IconRailLink
+              to="/settings/conta"
+              label="Sua conta"
+              active={location.pathname.startsWith('/settings')}
+            >
+              <Gear className="size-5" weight="bold" />
+            </IconRailLink>
+            <TenantExitButton compact />
+          </>
         ) : (
           <IconRailLink
             to="/settings"

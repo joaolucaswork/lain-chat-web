@@ -11,6 +11,7 @@ import { buildMemoryBlock, getSaoPauloToday, queryGraph, recallMemories, remembe
 import { MEM_TOOLS, callLlmStreamWithRetry, execLlmTool } from './llm.ts';
 import { maybeGenerateTitle } from './titles.ts';
 import { persistSession, sessionKey, streamKey } from './sessions.ts';
+import { personContext, readTenantProfile } from './profile.ts';
 
 export async function processMessage(session: Session, userMessage: string, signal?: AbortSignal, memKey?: string): Promise<void> {
   // 1. Hybrid paralelo: recall (vetor) + grafo. Grafo é best-effort, nunca bloqueia.
@@ -25,10 +26,14 @@ export async function processMessage(session: Session, userMessage: string, sign
 
   // 2. Monta contexto: system + memórias + histórico recente (sem acumular no session)
   // Data de hoje vai sempre — mesmo com recall vazio — para o LLM resolver "hoje/ontem".
+  // Nome do visitante (perfil demo, best-effort): entra CITADO como dado,
+  // efêmero por turno — nunca persiste na sessão nem nas memórias.
   const history = session.messages.filter(m => m.role !== 'system').slice(-20);
   const today = getSaoPauloToday();
+  const who = personContext(readTenantProfile(session.owner));
   const apiMessages: Array<Record<string, unknown>> = [
     session.messages[0] as unknown as Record<string, unknown>,
+    ...(who ? [{ role: 'system', content: who }] : []),
     ...(memBlock
       ? [{ role: 'system', content: `Contexto da memória de longo prazo (use quando relevante):\n${memBlock}` }]
       : [{ role: 'system', content: `Data de hoje: ${today.long} (${today.iso}, America/Sao_Paulo), hora: ${today.time}. Use para resolver "hoje/ontem", o dia da semana e "agora/há pouco" na conversa; relativos em memórias futuras resolvem pela data da tag.` }]),

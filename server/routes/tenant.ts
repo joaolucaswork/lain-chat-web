@@ -8,6 +8,9 @@
  * POST /api/tenant/mcp-token → emite um token MCP dedicado (upstream minta e
  *   gira o anel; a sessão cookie continua válida). Devolve {apiKey} UMA vez —
  *   o frontend mostra para copiar no client MCP (opencode/Claude Desktop).
+ * GET /api/tenant/profile → {name} (nome atual do visitante, null = sem perfil).
+ * POST /api/tenant/profile {name} → valida, salva no BFF e espelha no
+ *   upstream (best-effort); devolve {name}. Nunca troca o slug.
  * GET /api/me → {mode:'owner'} | {mode:'demo'} | {mode:'tenant', tenant}.
  */
 import { MEMORY_URL } from '../config.ts';
@@ -62,6 +65,54 @@ export async function handleTenant(req: Request, path: string): Promise<Response
     }
   }
 
+  // ── Perfil do visitante (nome que o agente usa; tema fica no frontend) ──
+  if (req.method === 'GET' && path === '/api/tenant/profile') {
+    const key = tenantKeyFromCookie(req);
+    if (!key) return json({ error: 'no tenant session' }, 401);
+    const { readTenantProfile } = await import('../lib/profile.ts');
+    const owner = await resolveOwner(req);
+    let name = readTenantProfile(owner);
+    if (name === null) {
+      // Conta anterior ao perfil local: o upstream tem o nome do signup —
+      // importa uma vez (best-effort) para o agente já chamar pelo nome.
+      try {
+        const res = await fetch(`${MEMORY_URL}/api/tenant/profile`, {
+          headers: { Authorization: `Bearer ${key}` },
+          signal: AbortSignal.timeout(8_000),
+        });
+        if (res.ok) {
+          const data = (await res.json().catch(() => null)) as { name?: unknown } | null;
+          const { writeTenantProfile } = await import('../lib/profile.ts');
+          if (typeof data?.name === 'string' && writeTenantProfile(owner, data.name).ok) {
+            name = readTenantProfile(owner);
+          }
+        }
+      } catch { /* sem upstream = sem nome (chat segue normal) */ }
+    }
+    return json({ ok: true, name });
+  }
+
+  if (req.method === 'POST' && path === '/api/tenant/profile') {
+    const key = tenantKeyFromCookie(req);
+    if (!key) return json({ error: 'no tenant session' }, 401);
+    let body: Record<string, unknown>;
+    try { body = await req.json(); } catch { return json({ error: 'Invalid JSON' }, 400); }
+    const { writeTenantProfile } = await import('../lib/profile.ts');
+    const owner = await resolveOwner(req);
+    const saved = writeTenantProfile(owner, body.name);
+    if (!saved.ok) return json({ error: saved.error }, 400);
+    // Espelha no canônico upstream (best-effort: perfil local já vale).
+    try {
+      await fetch(`${MEMORY_URL}/api/tenant/profile`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: saved.name }),
+        signal: AbortSignal.timeout(8_000),
+      });
+    } catch { /* upstream fora = sync fica para a próxima leitura */ }
+    return json({ ok: true, name: saved.name });
+  }
+
   // ── Logout (só limpa o cookie; os dados ficam até o wipe) ──
   if (req.method === 'POST' && path === '/api/tenant/logout') {
     const res = json({ ok: true });
@@ -84,6 +135,9 @@ export async function handleTenant(req: Request, path: string): Promise<Response
       // Transcripts saem junto (mesmo dono estável) — sem órfãos no disco.
       const { deleteOwnerSessions } = await import('../lib/sessions.ts');
       const wipedSessions = deleteOwnerSessions(await resolveOwner(req));
+      // Perfil (nome) é PII: sai junto no wipe.
+      const { deleteTenantProfile } = await import('../lib/profile.ts');
+      deleteTenantProfile(await resolveOwner(req));
       const out = json({ ok: true, ...data, wipedSessions });
       out.headers.set('Set-Cookie', tenantCookieClear());
       return out;
