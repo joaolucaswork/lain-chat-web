@@ -32,7 +32,9 @@ function DemoGate({ children }: { children: React.ReactNode }) {
   if (mode === 'unknown') return <RouteFallback variant="memories" />
   // owner (modo legado) nunca vê o gate; demo sem cookie vê; tenant entra direto.
   if (mode === 'demo' && !getTenantName()) {
-    return <AuthGate onDone={() => setTick((t) => t + 1)} />
+    // Pós-login: reload integral em vez de tick — o cookie novo só vale
+    // no próximo /api/me; sem isso o modo stale mostrava o gear pro tenant.
+    return <AuthGate onDone={() => window.location.reload()} />
   }
   return <MeContext.Provider value={mode}>{children}</MeContext.Provider>
 }

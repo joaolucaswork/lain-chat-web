@@ -2,7 +2,7 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion } from 'motion/react'
 import { useModel } from '@/hooks/useModel'
-import { useMeMode } from '@/hooks/useMe'
+import { getTenantName, useMeMode } from '@/hooks/useMe'
 import { TenantExitButton } from '@/components/TenantExitButton'
 import { useChat } from '@/hooks/useChat'
 import { useSessions } from '@/hooks/useSessions'
@@ -45,7 +45,9 @@ export function Layout() {
   })
   const { model } = useModel()
   const meMode = useMeMode()
-  const isTenant = meMode === 'tenant'
+  // Nome presente = sessão de visitante válida mesmo se o /api/me ainda
+  // está stale (pós-login sem reload) ou falhou (fallback 'owner').
+  const isTenant = meMode === 'tenant' || getTenantName() !== null
   const chat = useChat(model)
   const sess = useSessions({ activeSessionId: chat.sessionId, clearActiveSession: chat.clearSession })
   const rootRef = useRef<HTMLDivElement>(null)

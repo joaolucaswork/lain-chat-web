@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { ChatTeardrop, Brain, Gear, Plus } from '@phosphor-icons/react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { TenantExitButton } from '@/components/TenantExitButton'
-import { useMeMode } from '@/hooks/useMe'
+import { getTenantName, useMeMode } from '@/hooks/useMe'
 import { cn } from '@/lib/utils'
 
 interface MobileNavProps {
@@ -17,6 +17,7 @@ interface MobileNavProps {
 export function MobileNav({ open, onOpenChange, onNewChat, panel }: MobileNavProps) {
   const location = useLocation()
   const meMode = useMeMode()
+  const isTenant = meMode === 'tenant' || getTenantName() !== null
   const close = () => onOpenChange(false)
 
   return (
@@ -51,7 +52,7 @@ export function MobileNav({ open, onOpenChange, onNewChat, panel }: MobileNavPro
         >
           <MobileLink to="/" label="Chat" icon="chat" active={location.pathname === '/'} onClick={close} />
           <MobileLink to="/memorias" label="Memórias" icon="brain" active={location.pathname === '/memorias'} onClick={close} />
-          {meMode === 'tenant' ? (
+          {isTenant ? (
             <div className="flex min-w-0 flex-1" onClick={close}>
               <TenantExitButton />
             </div>
