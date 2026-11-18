@@ -185,7 +185,7 @@ export function TenantSettingsPage() {
                   aria-current={tab === t.id ? "page" : undefined}
                   className={
                     tab === t.id
-                      ? "whitespace-nowrap rounded-lg bg-accent px-3 py-2 text-left text-sm font-medium text-accent-foreground md:w-full"
+                      ? "whitespace-nowrap rounded-lg bg-foreground/10 px-3 py-2 text-left text-sm font-medium text-accent-foreground md:w-full"
                       : "whitespace-nowrap rounded-lg px-3 py-2 text-left text-sm text-foreground/70 hover:bg-accent/60 hover:text-accent-foreground md:w-full"
                   }
                 >
