@@ -104,7 +104,7 @@ export function TenantSettingsPage() {
   }
 
   const row =
-    "flex items-center justify-between gap-6 border-b border-border px-6 py-4 last:border-b-0";
+    "flex items-center justify-between gap-6 border-b border-border/50 px-6 py-4 last:border-b-0";
   const label = "text-[15px] text-foreground";
   const hint = "pt-0.5 text-sm text-muted-foreground";
 
@@ -209,7 +209,7 @@ export function TenantSettingsPage() {
                     </h2>
                     <form
                       onSubmit={(e) => void save(e)}
-                      className="overflow-hidden rounded-xl border border-border bg-card"
+                      className="overflow-hidden rounded-xl border border-border/60 bg-card"
                     >
                       <div className={row}>
                         <div>
@@ -221,7 +221,7 @@ export function TenantSettingsPage() {
                           placeholder="Seu nome"
                           maxLength={40}
                           autoComplete="nickname"
-                          className="w-64 rounded-lg border border-border/60 bg-background px-4 py-2 text-[13px] outline-none transition-shadow duration-200 focus-visible:ring-2 focus-visible:ring-foreground/20 focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+                          className="w-64 rounded-lg border border-border/50 bg-background px-4 py-2 text-[13px] outline-none transition-shadow duration-200 focus-visible:ring-2 focus-visible:ring-foreground/20 focus-visible:ring-offset-2 focus-visible:ring-offset-card"
                         />
                       </div>
                       <div className={row}>
@@ -231,7 +231,7 @@ export function TenantSettingsPage() {
                           </p>
                           <p className={hint}>Usado para login</p>
                         </div>
-                        <p className="w-64 truncate rounded-lg border border-border/60 bg-muted px-4 py-2 text-[13px] text-muted-foreground">
+                        <p className="w-64 truncate rounded-lg border border-border/50 bg-muted px-4 py-2 text-[13px] text-muted-foreground">
                           {email || "…"}
                         </p>
                       </div>
@@ -258,7 +258,7 @@ export function TenantSettingsPage() {
                   </section>
                   <section>
                     <h2 className="pb-3 text-lg font-bold">Aparência</h2>
-                    <div className="overflow-hidden rounded-xl border border-border bg-card">
+                    <div className="overflow-hidden rounded-xl border border-border/60 bg-card">
                       <div className={row}>
                         <div>
                           <p className={label}>Tema</p>
@@ -292,7 +292,7 @@ export function TenantSettingsPage() {
                       Exclua sua conta e todos os dados associados a ela.
                     </p>
                   </div>
-                  <div className="overflow-hidden rounded-xl border border-border bg-card">
+                  <div className="overflow-hidden rounded-xl border border-border/60 bg-card">
                     <div className={row}>
                       <div>
                         <p className={label}>Excluir minha conta</p>
