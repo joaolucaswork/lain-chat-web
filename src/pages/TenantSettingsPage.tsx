@@ -239,7 +239,7 @@ export function TenantSettingsPage() {
                 <div>
                   <p className={label}>Apagar meus dados</p>
                   <p className={`${hint} leading-relaxed`}>
-                    Remove memórias, grafo e conversas. A conta continua — sem volta.
+                    Remove memórias, grafo e conversas. Sua conta continua ativa.
                   </p>
                 </div>
                 <div className="flex w-64 shrink-0 items-center justify-end">
