@@ -106,7 +106,7 @@ export function TenantSettingsPage() {
   const row =
     "flex items-center justify-between gap-6 border-b border-border/50 px-6 py-4 last:border-b-0";
   const label = "text-[15px] text-foreground";
-  const hint = "pt-0.5 text-sm text-muted-foreground";
+  const hint = "pt-0.5 text-sm text-muted-foreground/70";
 
   /**
    * Exclusão total da conta (LGPD): dados + registro do tenant + usuário no
