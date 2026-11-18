@@ -2,10 +2,16 @@ import { useEffect, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { List } from '@phosphor-icons/react'
 import type { LayoutContext } from './Layout'
-import { useTheme } from '@/hooks/useTheme'
+import { useTheme, type ThemeMode } from '@/hooks/useTheme'
 import { getTenantName, setTenantName } from '@/hooks/useMe'
 import { supabase } from '@/lib/supabase'
-import { Moon, Sun } from '@phosphor-icons/react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 /**
  * Conta do visitante (demo): perfil + aparência.
@@ -15,7 +21,7 @@ import { Moon, Sun } from '@phosphor-icons/react'
  */
 export function TenantSettingsPage() {
   const { openMobileNav } = useOutletContext<LayoutContext>()
-  const { dark, toggle } = useTheme()
+  const { dark, theme, setTheme } = useTheme()
   const [name, setName] = useState(() => getTenantName() ?? '')
   const [savedName, setSavedName] = useState<string | null>(null)
   const [email, setEmail] = useState('')
@@ -153,17 +159,20 @@ export function TenantSettingsPage() {
               <div className={row}>
                 <div>
                   <p className={label}>Tema</p>
-                  <p className={hint}>{dark ? 'Escuro' : 'Claro'}</p>
+                  <p className={hint}>
+                    {theme === 'system' ? `Sistema (${dark ? 'escuro' : 'claro'})` : theme === 'dark' ? 'Escuro' : 'Claro'}
+                  </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={toggle}
-                  aria-label={dark ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
-                  className="flex w-64 items-center gap-3 rounded-lg border border-border/60 px-4 py-2 hover:bg-accent"
-                >
-                  {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
-                  <span className="text-[15px]">{dark ? 'Escuro' : 'Claro'}</span>
-                </button>
+                <Select value={theme} onValueChange={(v) => setTheme(v as ThemeMode)}>
+                  <SelectTrigger className="w-64">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="system">Sistema</SelectItem>
+                    <SelectItem value="light">Claro</SelectItem>
+                    <SelectItem value="dark">Escuro</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </section>
