@@ -238,9 +238,8 @@ export function TenantSettingsPage() {
               <div className={row}>
                 <div>
                   <p className={label}>Apagar meus dados</p>
-                  <p className={hint}>
-                    Remove memórias, grafo e conversas. Sua conta continua — entrar de novo começa
-                    do zero. Não tem como desfazer.
+                  <p className={`${hint} leading-relaxed`}>
+                    Remove memórias, grafo e conversas. A conta continua — sem volta.
                   </p>
                 </div>
                 <div className="flex w-64 shrink-0 items-center justify-end">
