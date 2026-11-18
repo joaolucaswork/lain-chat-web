@@ -113,8 +113,7 @@ export function TenantSettingsPage() {
             >
               <div className={row}>
                 <div>
-                  <p className={label}>Nome</p>
-                  <p className={hint}>Como o agente te chama</p>
+                  <p className="text-[13px] text-foreground">Nome</p>
                 </div>
                 <input
                   value={name}
@@ -127,7 +126,7 @@ export function TenantSettingsPage() {
               </div>
               <div className={row}>
                 <div>
-                  <p className={label}>E-mail principal</p>
+                  <p className="text-[13px] text-foreground">E-mail principal</p>
                   <p className={hint}>Usado para login</p>
                 </div>
                 <p className="w-64 truncate rounded-lg border border-input bg-muted px-4 py-2 text-muted-foreground">
@@ -160,7 +159,7 @@ export function TenantSettingsPage() {
                   type="button"
                   onClick={toggle}
                   aria-label={dark ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
-                  className="flex w-64 items-center gap-3 rounded-lg border border-input px-4 py-2 hover:bg-accent"
+                  className="flex w-64 items-center gap-3 rounded-lg border border-border/60 px-4 py-2 hover:bg-accent"
                 >
                   {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
                   <span className="text-[15px]">{dark ? 'Escuro' : 'Claro'}</span>
