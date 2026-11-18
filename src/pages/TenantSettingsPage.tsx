@@ -171,14 +171,7 @@ export function TenantSettingsPage() {
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-4xl space-y-10 px-4 py-6">
-          <div>
-            <h1 className="text-2xl font-bold">Preferências</h1>
-            <p className="pt-2 text-[15px] text-muted-foreground">
-              Gerencie seu perfil e a aparência do app.
-            </p>
-          </div>
-
+        <div className="mx-auto max-w-4xl px-4 py-6">
           <div className="flex flex-col gap-6 md:flex-row md:gap-12">
             <nav
               aria-label="Seções da conta"
@@ -204,6 +197,12 @@ export function TenantSettingsPage() {
             <div className="min-w-0 flex-1">
               {tab === "configuracoes" && (
                 <div className="space-y-8">
+                  <div>
+                    <h1 className="text-2xl font-bold">Preferências</h1>
+                    <p className="pt-2 text-[15px] text-muted-foreground">
+                      Gerencie seu perfil e a aparência do app.
+                    </p>
+                  </div>
                   <section>
                     <h2 className="pb-3 text-lg font-bold">
                       Informações do perfil
@@ -286,8 +285,13 @@ export function TenantSettingsPage() {
                 </div>
               )}
               {tab === "dados" && (
-                <section>
-                  <h2 className="pb-3 text-lg font-bold">Dados</h2>
+                <div className="space-y-8">
+                  <div>
+                    <h1 className="text-2xl font-bold">Dados</h1>
+                    <p className="pt-2 text-[15px] text-muted-foreground">
+                      Exclua sua conta e todos os dados associados a ela.
+                    </p>
+                  </div>
                   <div className="overflow-hidden rounded-xl border border-border bg-card">
                     <div className={row}>
                       <div>
@@ -307,7 +311,7 @@ export function TenantSettingsPage() {
                       </div>
                     </div>
                   </div>
-                </section>
+                </div>
               )}
             </div>
           </div>
