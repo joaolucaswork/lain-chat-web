@@ -43,9 +43,9 @@ function FloatInput({
         autoComplete={autoComplete}
         autoFocus={autoFocus}
         maxLength={maxLength}
-        className={`peer w-full rounded border border-neutral-300 bg-white px-4 pb-2 pt-5 text-[15px] text-neutral-900 outline-none focus:border-neutral-900 ${passwordToggle ? 'pr-11' : ''}`}
+        className={`peer w-full rounded border border-neutral-300 bg-white px-4 pb-2 pt-6 text-[15px] text-neutral-900 outline-none focus:border-neutral-900 ${passwordToggle ? 'pr-11' : ''}`}
       />
-      <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[15px] text-neutral-500 transition-all peer-focus:top-3 peer-focus:translate-y-0 peer-focus:text-xs peer-focus:text-neutral-700 peer-[:not(:placeholder-shown)]:top-3 peer-[:not(:placeholder-shown)]:translate-y-0 peer-[:not(:placeholder-shown)]:text-xs">
+      <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[15px] text-neutral-500 transition-all peer-focus:top-1.5 peer-focus:translate-y-0 peer-focus:text-xs peer-focus:text-neutral-700 peer-[:not(:placeholder-shown)]:top-1.5 peer-[:not(:placeholder-shown)]:translate-y-0 peer-[:not(:placeholder-shown)]:text-xs">
         {label}
       </span>
       {passwordToggle && (
