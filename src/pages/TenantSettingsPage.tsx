@@ -21,7 +21,7 @@ import {
  */
 export function TenantSettingsPage() {
   const { openMobileNav } = useOutletContext<LayoutContext>()
-  const { dark, theme, setTheme } = useTheme()
+  const { theme, setTheme } = useTheme()
   const [name, setName] = useState(() => getTenantName() ?? '')
   const [savedName, setSavedName] = useState<string | null>(null)
   const [email, setEmail] = useState('')
@@ -159,9 +159,7 @@ export function TenantSettingsPage() {
               <div className={row}>
                 <div>
                   <p className={label}>Tema</p>
-                  <p className={hint}>
-                    {theme === 'system' ? `Sistema (${dark ? 'escuro' : 'claro'})` : theme === 'dark' ? 'Escuro' : 'Claro'}
-                  </p>
+                  <p className={hint}>Como a interface aparece para você.</p>
                 </div>
                 <Select value={theme} onValueChange={(v) => setTheme(v as ThemeMode)}>
                   <SelectTrigger className="w-64">
