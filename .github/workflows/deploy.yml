@@ -18,8 +18,9 @@ jobs:
         with:
           bun-version: latest
       - run: bun install
-      - run: bunx tsc -b
-      - run: bun test
+      - run: bun run typecheck
+      # bun run (não bun test): o script inclui --preload do env de teste.
+      - run: bun run test
 
   deploy:
     needs: verify
