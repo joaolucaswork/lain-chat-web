@@ -6,9 +6,62 @@ import { setTenantName } from '@/hooks/useMe'
 /**
  * Gate de entrada com Supabase Auth em 2 etapas (visual estilo Asana):
  * 1) centralizado: título + email + botão preto + perks;
- * 2) à esquerda: nome (signup) + senha com underline + Continue.
+ * 2) nome (signup) + senha, inputs Google-like com floating label.
  * Troca a sessão por cookie HttpOnly via /api/auth/exchange.
  */
+
+/**
+ * Input Google-like: label dentro do campo, flutua pra cima ao focar ou
+ * preencher (peer + placeholder=" "). Olho opcional pra senha.
+ */
+function FloatInput({
+  value,
+  onChange,
+  label,
+  type = 'text',
+  autoComplete,
+  autoFocus,
+  maxLength,
+  passwordToggle,
+}: {
+  value: string
+  onChange: (v: string) => void
+  label: string
+  type?: string
+  autoComplete?: string
+  autoFocus?: boolean
+  maxLength?: number
+  passwordToggle?: { show: boolean; onToggle: () => void }
+}) {
+  return (
+    <div className="relative">
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder=" "
+        type={passwordToggle ? (passwordToggle.show ? 'text' : 'password') : type}
+        autoComplete={autoComplete}
+        autoFocus={autoFocus}
+        maxLength={maxLength}
+        className={`peer w-full rounded border border-neutral-300 bg-white px-4 pb-2 pt-5 text-[15px] text-neutral-900 outline-none focus:border-neutral-900 ${passwordToggle ? 'pr-11' : ''}`}
+      />
+      <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[15px] text-neutral-500 transition-all peer-focus:top-3 peer-focus:translate-y-0 peer-focus:text-xs peer-focus:text-neutral-700 peer-[:not(:placeholder-shown)]:top-3 peer-[:not(:placeholder-shown)]:translate-y-0 peer-[:not(:placeholder-shown)]:text-xs">
+        {label}
+      </span>
+      {passwordToggle && (
+        <button
+          type="button"
+          onClick={passwordToggle.onToggle}
+          aria-label={passwordToggle.show ? 'Ocultar senha' : 'Mostrar senha'}
+          className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-neutral-500"
+        >
+          {passwordToggle.show ? <EyeSlash className="size-5" /> : <Eye className="size-5" />}
+        </button>
+      )}
+    </div>
+  )
+}
+
 export function AuthGate({ onDone }: { onDone: () => void }) {
   const [mode, setMode] = useState<'login' | 'signup'>('signup')
   const [step, setStep] = useState<1 | 2>(1)
@@ -184,15 +237,16 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
                 ? 'Ao criar a conta, você concorda com os Termos e a Privacidade.'
                 : 'Bem-vindo de volta — sua memória continua onde você parou.'}
             </p>
-            <input
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="voce@email.com"
-              type="email"
-              autoComplete="email"
-              autoFocus
-              className="w-full rounded border border-neutral-300 bg-white px-4 py-3 outline-none focus:border-neutral-900"
-            />
+            <div className="text-left">
+              <FloatInput
+                value={email}
+                onChange={setEmail}
+                label="E-mail"
+                type="email"
+                autoComplete="email"
+                autoFocus
+              />
+            </div>
             {error && <p className="text-sm text-rose-600">{error}</p>}
             <button type="submit" disabled={busy} className={blackBtn}>
               Continuar
@@ -250,44 +304,22 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
             {mode === 'signup' ? 'Criando a conta como' : 'Entrando como'} {email.trim()}.
           </p>
           {mode === 'signup' && (
-            <div>
-              <label className="text-sm font-bold">Qual é o seu nome?</label>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                maxLength={40}
-                autoComplete="nickname"
-                autoFocus
-                className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-neutral-900"
-              />
-              {error === 'Informe seu nome.' && <p className="pt-1 text-xs text-rose-600">Informe seu nome.</p>}
-            </div>
+            <FloatInput value={name} onChange={setName} label="Nome" autoComplete="nickname" autoFocus maxLength={40} />
           )}
           <div>
-            <label className="text-sm font-bold">Senha</label>
-            <div className="relative">
-              <input
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                type={showPassword ? 'text' : 'password'}
-                autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-                autoFocus={mode === 'login'}
-                className="w-full border-b border-neutral-300 bg-transparent py-2 pr-10 outline-none focus:border-neutral-900"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((v) => !v)}
-                aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
-                className="absolute right-0 top-1/2 -translate-y-1/2 p-1 text-neutral-500"
-              >
-                {showPassword ? <EyeSlash className="size-5" /> : <Eye className="size-5" />}
-              </button>
-            </div>
+            <FloatInput
+              value={password}
+              onChange={setPassword}
+              label={mode === 'signup' ? 'Criar senha' : 'Senha'}
+              autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+              autoFocus={mode === 'login'}
+              passwordToggle={{ show: showPassword, onToggle: () => setShowPassword((v) => !v) }}
+            />
             {mode === 'signup' && (
               <p className="pt-1 text-xs text-neutral-500">Crie uma senha com pelo menos 6 caracteres.</p>
             )}
           </div>
-          {error && error !== 'Informe seu nome.' && <p className="text-sm text-rose-600">{error}</p>}
+          {error && <p className="text-sm text-rose-600">{error}</p>}
           {info && <p className="text-sm text-neutral-600">{info}</p>}
           <button type="submit" disabled={busy || !step2Valid} className={blackBtn}>
             {busy ? 'Aguarde…' : 'Continuar'}
