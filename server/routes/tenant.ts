@@ -5,6 +5,9 @@
  *   num cookie HttpOnly e devolve {tenant}. Nome duplicado → 409 (a UI pede outro).
  * POST /api/tenant/logout → limpa o cookie (sessões ficam órfãs no disco do dono).
  * DELETE /api/tenant/data → wipe total no lain-memory (LGPD) + limpa o cookie.
+ * POST /api/tenant/mcp-token → emite um token MCP dedicado (upstream minta e
+ *   gira o anel; a sessão cookie continua válida). Devolve {apiKey} UMA vez —
+ *   o frontend mostra para copiar no client MCP (opencode/Claude Desktop).
  * GET /api/me → {mode:'owner'} | {mode:'demo'} | {mode:'tenant', tenant}.
  */
 import { MEMORY_URL } from '../config.ts';
@@ -37,6 +40,24 @@ export async function handleTenant(req: Request, path: string): Promise<Response
       const msg = err instanceof Error ? err.message : String(err);
       const status = msg.includes('already taken') ? 409 : 502;
       return json({ error: msg }, status);
+    }
+  }
+
+  // ── Token MCP dedicado (remoto por conta: opencode/Claude → /mcp) ──
+  if (req.method === 'POST' && path === '/api/tenant/mcp-token') {
+    const key = tenantKeyFromCookie(req);
+    if (!key) return json({ error: 'no tenant session' }, 401);
+    try {
+      const res = await fetch(`${MEMORY_URL}/api/tenant/mcp-token`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${key}` },
+        signal: AbortSignal.timeout(15_000),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return json({ error: (data as { error?: string }).error ?? 'mint failed' }, res.status);
+      return json({ ok: true, ...(data as object) });
+    } catch {
+      return json({ error: 'lain-memory unavailable' }, 502);
     }
   }
 
