@@ -43,7 +43,7 @@ export function TenantSettingsPage() {
   const [wipeConfirm, setWipeConfirm] = useState('')
   const [wipeBusy, setWipeBusy] = useState(false)
   const [wipeError, setWipeError] = useState('')
-  const wipeReady = wipeConfirm.trim().toUpperCase() === WIPE_WORD
+  const wipeReady = wipeConfirm.trim() === WIPE_WORD
 
   useEffect(() => {
     let alive = true
