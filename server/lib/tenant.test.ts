@@ -5,9 +5,8 @@
 import { describe, expect, test } from 'bun:test';
 import { existsSync, rmSync } from 'node:fs';
 
-// Hermético: fixa a key do owner ANTES de importar o config (que congela
-// env no primeiro import). Sem isso o teste herdava LAIN_* do shell local
-// e quebrava em CI. Não sobrescreve env real quando houver.
+// Hermético: preload (server/test-env.ts) fixa a key do owner antes de
+// qualquer import; o ??= abaixo protege execução direta do arquivo.
 process.env.LAIN_MEMORY_API_KEY ??= 'test-owner-master-key-0123456789abcdef';
 
 const tenant = await import('./tenant.ts');
