@@ -9,7 +9,7 @@
  */
 import { MEMORY_URL } from '../config.ts';
 import { json } from '../lib/http.ts';
-import { isDemoMode, isTenantRequest, proxyTenantSignup, tenantCookieClear, tenantCookieSet, tenantKeyFromCookie } from '../lib/tenant.ts';
+import { isDemoMode, isTenantRequest, proxyTenantSignup, resolveOwner, tenantCookieClear, tenantCookieSet, tenantKeyFromCookie } from '../lib/tenant.ts';
 
 export async function handleTenant(req: Request, path: string): Promise<Response | null> {
   // ── Quem sou eu (o frontend decide: app normal, gate ou app de visitante) ──
@@ -47,7 +47,7 @@ export async function handleTenant(req: Request, path: string): Promise<Response
     return res;
   }
 
-  // ── Wipe total (LGPD): memórias + grafo + blocklist do tenant ──
+  // ── Wipe total (LGPD): memórias + grafo + blocklist do tenant + transcripts ──
   if (req.method === 'DELETE' && path === '/api/tenant/data') {
     const key = tenantKeyFromCookie(req);
     if (!key) return json({ error: 'no tenant session' }, 401);
@@ -59,9 +59,11 @@ export async function handleTenant(req: Request, path: string): Promise<Response
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) return json({ error: 'wipe failed' }, 502);
-      const out = json({ ok: true, ...data });
+      // Transcripts saem junto (mesmo dono estável) — sem órfãos no disco.
+      const { deleteOwnerSessions } = await import('../lib/sessions.ts');
+      const wipedSessions = deleteOwnerSessions(await resolveOwner(req));
+      const out = json({ ok: true, ...data, wipedSessions });
       out.headers.set('Set-Cookie', tenantCookieClear());
-      // Nota: as sessões do dono ficam órfãs no disco (sem key, sem acesso).
       return out;
     } catch {
       return json({ error: 'lain-memory unavailable' }, 502);

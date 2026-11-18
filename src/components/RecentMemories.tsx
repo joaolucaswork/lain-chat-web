@@ -67,12 +67,14 @@ export function RecentMemories() {
       setJustOpened(true)
       if (openTimer.current) window.clearTimeout(openTimer.current)
       openTimer.current = window.setTimeout(() => setJustOpened(false), 1100)
+    } else {
+      search.closeSearch()
     }
     setCollapsed((v) => {
       writeCollapsedHome(!v)
       return !v
     })
-  }, [collapsed])
+  }, [collapsed, search])
 
   const handleOpenSearch = useCallback(() => {
     search.openSearch()

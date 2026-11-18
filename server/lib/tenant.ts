@@ -15,7 +15,20 @@ import { MEMORY_KEY, MEMORY_URL, DEFAULT_MODEL } from '../config.ts';
 export const TENANT_COOKIE = 'lain_tk';
 export const OWNER = 'owner';
 
-/** basename seguro para subdiretório de sessões (hash, sem PII). */
+/** Prefixo dos diretórios de sessão por tenant estável (`t-<slug>`). */
+export const TENANT_DIR_PREFIX = 't-';
+
+/** Slug seguro para diretório: o que normalizeTenant/slugify produzem. */
+export function isTenantSlug(slug: string): boolean {
+  return /^[a-z0-9-]{2,40}$/.test(slug);
+}
+
+/** sha256 da key — chave do cache slug (nunca persiste, nunca vai ao log). */
+export function keyHashFor(memoryKey: string): string {
+  return createHash('sha256').update(memoryKey).digest('hex');
+}
+
+/** basename seguro para subdiretório de sessões (hash, sem PII). Legado. */
 export function ownerHashFor(memoryKey: string): string {
   if (!memoryKey || memoryKey === MEMORY_KEY) return OWNER;
   return `k-${createHash('sha256').update(memoryKey).digest('hex').slice(0, 16)}`;
@@ -26,9 +39,49 @@ export function memoryKeyForRequest(req: Request): string {
   return tenantKeyFromCookie(req) ?? MEMORY_KEY;
 }
 
-/** Dono das sessões para este request. */
+/** Dono das sessões para este request (legado, por hash de key). */
 export function ownerForRequest(req: Request): string {
   return ownerHashFor(memoryKeyForRequest(req));
+}
+
+/**
+ * Dono estável das sessões: `t-<slug>` resolvido via /api/tenant/whoami e
+ * cacheado por hash de key. History sobrevive à rotação de key no login.
+ * Sem cookie → 'owner' (legado). Master (`lucas`) → 'owner' (sessões
+ * antigas continuam na raiz). Falha no whoami → fallback legado por hash
+ * (sessões offline continuam acessíveis).
+ */
+const _slugCache = new Map<string, { slug: string; at: number }>();
+const SLUG_CACHE_TTL = 10 * 60_000;
+
+export function cacheSlugForKey(memoryKey: string, slug: string): void {
+  if (!memoryKey || !isTenantSlug(slug)) return;
+  if (_slugCache.size > 2000) _slugCache.clear();
+  _slugCache.set(keyHashFor(memoryKey), { slug, at: Date.now() });
+}
+
+export async function resolveOwner(req: Request): Promise<string> {
+  const key = memoryKeyForRequest(req);
+  if (!key || key === MEMORY_KEY) return OWNER;
+  const kh = keyHashFor(key);
+  const hit = _slugCache.get(kh);
+  if (hit && Date.now() - hit.at < SLUG_CACHE_TTL) {
+    return `${TENANT_DIR_PREFIX}${hit.slug}`;
+  }
+  try {
+    const res = await fetch(`${MEMORY_URL}/api/tenant/whoami`, {
+      headers: { Authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!res.ok) throw new Error(`whoami → ${res.status}`);
+    const data = (await res.json()) as { tenant?: string };
+    const slug = typeof data?.tenant === 'string' ? data.tenant : '';
+    if (!isTenantSlug(slug) || slug === 'lucas') return OWNER;
+    cacheSlugForKey(key, slug);
+    return `${TENANT_DIR_PREFIX}${slug}`;
+  } catch {
+    return ownerHashFor(key); // offline: comportamento legado
+  }
 }
 
 /** Visitante (cookie) ou owner? */

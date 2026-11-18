@@ -9,7 +9,7 @@
  */
 import { MEMORY_KEY, MEMORY_URL } from '../config.ts';
 import { json } from '../lib/http.ts';
-import { tenantCookieSet } from '../lib/tenant.ts';
+import { cacheSlugForKey, tenantCookieSet } from '../lib/tenant.ts';
 import { getSupabaseUser, isSupabaseConfigured } from '../lib/supabase.ts';
 
 // Anti-abuso do exchange: 20/h por IP (login legítimo raramente repete).
@@ -85,5 +85,7 @@ export async function handleAuth(req: Request, path: string): Promise<Response |
 
   const out = json({ ok: true, tenant: linked.tenant });
   out.headers.set('Set-Cookie', tenantCookieSet(linked.apiKey));
+  // Pré-aquece o roteamento de sessões: primeiro chat já cai no dir estável.
+  cacheSlugForKey(linked.apiKey, linked.tenant);
   return out;
 }

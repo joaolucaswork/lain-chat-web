@@ -48,7 +48,9 @@ export function isSafeSessionId(id: string): boolean {
 }
 
 export function isSafeOwner(owner: string): boolean {
-  return owner === OWNER || /^k-[0-9a-f]{16}$/.test(owner);
+  if (owner === OWNER) return true;
+  if (/^k-[0-9a-f]{16}$/.test(owner)) return true; // legado (pré-slug)
+  return /^t-[a-z0-9-]{2,40}$/.test(owner);
 }
 
 export function sessionDir(owner: string): string {
@@ -194,6 +196,23 @@ export function findSession(id: string, owner: string = OWNER): Session | undefi
 /** Sessão sem nenhuma mensagem de usuário/assistente — não aparece na lista. */
 export function isEmptySession(s: Session): boolean {
   return !s.messages.some(m => m.role !== 'system' && m.content?.trim());
+}
+
+/** Apaga TODAS as sessões de um dono (wipe LGPD: transcripts saem junto). */
+export function deleteOwnerSessions(owner: string): number {
+  if (!isSafeOwner(owner)) return 0;
+  let n = 0;
+  for (const [key, s] of sessions) {
+    if (s.owner !== owner) continue;
+    sessions.delete(key);
+    const stream = sessionKey(owner, s.id);
+    abortCtrls.get(stream)?.abort();
+    abortCtrls.delete(stream);
+    dropSessionClients(stream);
+    try { unlinkSync(sessionFile(s.id, s.owner)); } catch { /* já sumiu */ }
+    n++;
+  }
+  return n;
 }
 
 export function deleteSession(id: string, owner: string = OWNER): boolean {

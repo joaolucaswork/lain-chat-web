@@ -3,11 +3,11 @@ import { randomUUID } from 'node:crypto';
 import { abortCtrls, findSession, getSession, persistSession, sessionKey, streamKey } from '../lib/sessions.ts';
 import { addSseClient, broadcast, removeSseClient } from '../lib/sse.ts';
 import { json, sseMsg, withSecurityHeaders } from '../lib/http.ts';
-import { effectiveModel, memoryKeyForRequest, ownerForRequest } from '../lib/tenant.ts';
+import { effectiveModel, memoryKeyForRequest, resolveOwner } from '../lib/tenant.ts';
 import { runTurn } from '../lib/chat.ts';
 
 export async function handleChat(req: Request, path: string, params: URLSearchParams): Promise<Response | null> {
-  const owner = ownerForRequest(req);
+  const owner = await resolveOwner(req);
   const memKey = memoryKeyForRequest(req);
 
   // ── SSE ──

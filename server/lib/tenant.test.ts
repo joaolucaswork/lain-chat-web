@@ -104,5 +104,40 @@ describe('sessões por dono (T6)', () => {
     expect(sessions.isSafeOwner('../x')).toBe(false);
     expect(sessions.isSafeOwner('owner')).toBe(true);
     expect(sessions.isSafeOwner('k-0123456789abcdef')).toBe(true);
+    expect(sessions.isSafeOwner('t-ana-maria')).toBe(true);
+    expect(sessions.isSafeOwner('t-../x')).toBe(false);
+    expect(sessions.isSafeOwner('t-a')).toBe(false);
+  });
+});
+
+describe('resolveOwner (slug estável)', () => {
+  test('usa o slug cacheado sem rede', async () => {
+    const key = 'lm_' + 'd'.repeat(48);
+    tenant.cacheSlugForKey(key, 'ana');
+    const req = reqWithCookie(`${tenant.TENANT_COOKIE}=${key}`);
+    expect(await tenant.resolveOwner(req)).toBe('t-ana');
+  });
+
+  test('sem rede cai no hash legado (sessões offline acessíveis)', async () => {
+    const orig = globalThis.fetch;
+    globalThis.fetch = (() => Promise.reject(new Error('down'))) as typeof fetch;
+    try {
+      const key = 'lm_' + 'e'.repeat(48);
+      const req = reqWithCookie(`${tenant.TENANT_COOKIE}=${key}`);
+      expect(await tenant.resolveOwner(req)).toBe(tenant.ownerHashFor(key));
+    } finally {
+      globalThis.fetch = orig;
+    }
+  });
+
+  test('sem cookie e master continuam owner', async () => {
+    expect(await tenant.resolveOwner(reqWithCookie(null))).toBe('owner');
+  });
+
+  test('isTenantSlug valida formato', () => {
+    expect(tenant.isTenantSlug('ana-maria')).toBe(true);
+    expect(tenant.isTenantSlug('../x')).toBe(false);
+    expect(tenant.isTenantSlug('a')).toBe(false);
+    expect(tenant.isTenantSlug('LUCAS')).toBe(false);
   });
 });

@@ -1,11 +1,11 @@
 /** Rotas de sessões: lista, delete e patch (título/favorito). Tudo filtrado por dono. */
 import { unlinkSync } from 'node:fs';
 import { deleteSession, findSession, isEmptySession, isSafeSessionId, persistSession, sessionFile, sessions } from '../lib/sessions.ts';
-import { ownerForRequest } from '../lib/tenant.ts';
+import { resolveOwner } from '../lib/tenant.ts';
 import { json } from '../lib/http.ts';
 
 export async function handleSessions(req: Request, path: string, params: URLSearchParams): Promise<Response | null> {
-  const owner = ownerForRequest(req);
+  const owner = await resolveOwner(req);
   // ── Sessions ──
   // Sessões vazias (só system, nenhuma mensagem) ficam de fora — clicar no
   // lápis só abre a caixa vazia, sem criar entrada no histórico.
