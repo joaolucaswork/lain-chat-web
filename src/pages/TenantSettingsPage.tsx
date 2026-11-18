@@ -198,7 +198,7 @@ export function TenantSettingsPage() {
               {tab === "configuracoes" && (
                 <div className="space-y-8">
                   <div>
-                    <h1 className="text-2xl font-bold">Preferências</h1>
+                    <h1 className="text-2xl font-semibold">Preferências</h1>
                     <p className="pt-2 text-[15px] text-muted-foreground">
                       Gerencie seu perfil e a aparência do app.
                     </p>
