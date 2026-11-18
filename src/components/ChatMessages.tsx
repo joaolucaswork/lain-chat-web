@@ -8,7 +8,7 @@ import {
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { Streamdown } from 'streamdown'
+import { Markdown } from '@/components/Markdown'
 import { ArrowDown, Check, Copy, ArrowCounterClockwise } from '@phosphor-icons/react'
 
 interface ChatMessagesProps {
@@ -193,7 +193,7 @@ export function ChatMessages({ messages, processing, onRetry }: ChatMessagesProp
                   <MessageContent className="min-w-0">
                     <Bubble variant="ghost" className="min-w-0 max-w-full">
                       <BubbleContent className="min-w-0 max-w-full overflow-hidden text-[15px] font-[360] leading-[1.7] tracking-[0.01em] break-words sm:text-[16px] sm:leading-[1.8] sm:tracking-[0.015em] [&_pre]:max-w-full [&_pre]:overflow-x-auto [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto">
-                        <Streamdown>{msg.content}</Streamdown>
+                        <Markdown content={msg.content} />
                       </BubbleContent>
                     </Bubble>
                   </MessageContent>

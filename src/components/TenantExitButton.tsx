@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { SignOut } from '@phosphor-icons/react'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { supabase } from '@/lib/supabase'
 import { clearTenantName, getTenantName, useMeMode } from '@/hooks/useMe'
 
@@ -31,17 +32,27 @@ export function TenantExitButton({ compact }: { compact?: boolean }) {
   }
 
   if (!getTenantName() && meMode !== 'tenant') return null
-  return (
+  const label = 'Sair (mantém seus dados)'
+  const btn = (
     <button
       type="button"
       onClick={() => void logout()}
       disabled={busy !== null}
-      title="Sair (mantém seus dados)"
-      aria-label="Sair (mantém seus dados)"
+      title={label}
+      aria-label={label}
       className="flex w-full items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-medium text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground disabled:opacity-40"
     >
       <SignOut className={compact ? 'size-5 shrink-0' : 'size-4 shrink-0'} weight="bold" />
       {!compact && <span className="truncate">{busy === 'logout' ? 'Saindo…' : 'Sair'}</span>}
     </button>
+  )
+  // No rail (compact) o rótulo não aparece — usa o mesmo Tooltip
+  // dos vizinhos (IconRailButton/Link), abrindo para a direita.
+  if (!compact) return btn
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{btn}</TooltipTrigger>
+      <TooltipContent side="right">{label}</TooltipContent>
+    </Tooltip>
   )
 }

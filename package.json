@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:bff": "bun --watch run server/server.ts",
+    "dev:all": "concurrently -k -n bff,vite -c blue,green \"bun run dev:bff\" \"bun run dev\"",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b",
     "lint": "oxlint",
@@ -35,6 +37,7 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
+    "concurrently": "^10.0.7",
     "oxlint": "^1.71.0",
     "react-grab": "^0.2.0",
     "typescript": "~6.0.2",

@@ -1,10 +1,18 @@
+import { Suspense, lazy } from 'react'
 import { motion } from 'motion/react'
 import { useOutletContext } from 'react-router-dom'
 import { ChatMessages } from '@/components/ChatMessages'
 import { ChatInput } from '@/components/ChatInput'
-import { RecentMemories } from '@/components/RecentMemories'
+import { InitialSkeleton } from '@/components/recent/RecentMemoriesSkeleton'
 import { List } from '@phosphor-icons/react'
 import type { LayoutContext } from './Layout'
+
+// WHY: o carrossel (swiper, ~84kB) só aparece no estado vazio do chat.
+// Lazy tira ele do bundle inicial; o fallback é o mesmo skeleton que o
+// componente já mostra durante o load dos dados.
+const RecentMemories = lazy(() =>
+  import('@/components/RecentMemories').then((m) => ({ default: m.RecentMemories })),
+)
 
 const spring = { type: 'spring' as const, stiffness: 260, damping: 32 }
 
@@ -61,7 +69,9 @@ export function ChatPage() {
             />
           </motion.div>
           <div className="w-full max-w-[804px] min-w-0 overflow-hidden pt-4 sm:pt-6">
-            <RecentMemories />
+            <Suspense fallback={<InitialSkeleton />}>
+              <RecentMemories />
+            </Suspense>
           </div>
         </motion.div>
       ) : (

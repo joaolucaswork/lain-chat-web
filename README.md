@@ -14,7 +14,8 @@ bun run build    # gera dist/ servido pelo BFF
 bun run server   # :3335
 ```
 
-Dev (HMR): `bun run server` num terminal + `bun run dev` noutro (`/api/*` proxia para `:3335`).
+Dev (HMR): `bun run dev:all` (BFF com `--watch` + Vite juntos; abra `http://localhost:5173`).
+Se o pm2 estiver com o BFF no ar, pare antes (`pm2 stop lain-chat-bff`) senão dá EADDRINUSE no `:3335`.
 
 ## Como funciona
 

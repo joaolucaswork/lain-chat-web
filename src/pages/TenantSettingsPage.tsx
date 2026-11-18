@@ -1,7 +1,4 @@
 import { useEffect, useState } from "react";
-import { useOutletContext } from "react-router-dom";
-import { List } from "@phosphor-icons/react";
-import type { LayoutContext } from "./Layout";
 import { useTheme, type ThemeMode } from "@/hooks/useTheme";
 import { getTenantName, setTenantName, clearTenantName } from "@/hooks/useMe";
 import { supabase } from "@/lib/supabase";
@@ -28,7 +25,6 @@ import {
  * barato para tenants e a trava real é no server (effectiveModel).
  */
 export function TenantSettingsPage() {
-  const { openMobileNav } = useOutletContext<LayoutContext>();
   const { theme, setTheme } = useTheme();
   const [name, setName] = useState(() => getTenantName() ?? "");
   const [savedName, setSavedName] = useState<string | null>(null);
@@ -158,18 +154,6 @@ export function TenantSettingsPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex shrink-0 items-center gap-3 border-b border-border bg-card px-4 py-2">
-        <button
-          type="button"
-          aria-label="Abrir menu"
-          onClick={openMobileNav}
-          className="flex size-8 items-center justify-center rounded-md hover:bg-accent md:hidden"
-        >
-          <List className="size-5" />
-        </button>
-        <h2 className="text-sm font-semibold">Sua conta</h2>
-      </div>
-
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-4xl px-4 py-6">
           <div className="flex flex-col gap-6 md:flex-row md:gap-12">
