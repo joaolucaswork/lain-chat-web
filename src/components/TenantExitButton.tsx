@@ -40,7 +40,7 @@ export function TenantExitButton({ compact }: { compact?: boolean }) {
       aria-label="Sair (mantém seus dados)"
       className="flex w-full items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-medium text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground disabled:opacity-40"
     >
-      <SignOut className="size-4 shrink-0" />
+      <SignOut className="size-4 shrink-0" weight="bold" />
       {!compact && <span className="truncate">{busy === 'logout' ? 'Saindo…' : 'Sair'}</span>}
     </button>
   )
