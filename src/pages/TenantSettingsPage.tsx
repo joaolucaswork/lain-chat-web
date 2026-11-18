@@ -204,7 +204,7 @@ export function TenantSettingsPage() {
                     </p>
                   </div>
                   <section>
-                    <h2 className="pb-5 text-base font-bold">
+                    <h2 className="pb-5 text-base font-medium">
                       Informações do perfil
                     </h2>
                     <form
