@@ -1,27 +1,47 @@
 import { useState } from 'react'
-import { SignOut } from '@phosphor-icons/react'
+import { SignOut, Trash } from '@phosphor-icons/react'
 import { supabase } from '@/lib/supabase'
 import { clearTenantName, getTenantName, useMeMode } from '@/hooks/useMe'
 
 /**
- * Saída do visitante (T6/T7): apaga TODOS os dados do tenant no lain-memory
- * (LGPD wipe) + limpa a sessão local. Com confirmação — não tem undo.
+ * Saída do visitante com conta real (Supabase).
+ *
+ * "Sair" = só encerra a sessão (cookie + Supabase). Os dados ficam — ao
+ * entrar de novo, tudo está lá (a key do tenant rotaciona no login).
+ * "Apagar tudo" = wipe LGPD (memórias + grafo) com confirmação; a conta
+ * continua, entrar de novo começa do zero. Sem undo.
  */
 export function TenantExitButton({ compact }: { compact?: boolean }) {
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusy] = useState<null | 'logout' | 'wipe'>(null)
   const meMode = useMeMode()
 
-  async function exit() {
+  async function logout() {
+    if (busy) return
+    setBusy('logout')
+    try {
+      await fetch('/api/tenant/logout', { method: 'POST' })
+    } catch {}
+    try {
+      await supabase()?.auth.signOut()
+    } catch {}
+    clearTenantName()
+    try {
+      sessionStorage.clear()
+    } catch {}
+    window.location.href = '/'
+  }
+
+  async function wipe() {
     if (busy) return
     const name = getTenantName() ?? 'visitante'
     if (
       !window.confirm(
-        `Sair e apagar tudo de "${name}"?\n\nSuas memórias, conversas e grafo são eliminados do servidor. Não tem como desfazer.`,
+        `Apagar TODOS os dados de "${name}"?\n\nSuas memórias e grafo são eliminados do servidor. Sua conta continua — entrar de novo começa do zero. Não tem como desfazer.`,
       )
     ) {
       return
     }
-    setBusy(true)
+    setBusy('wipe')
     try {
       await fetch('/api/tenant/data', { method: 'DELETE' })
     } catch {
@@ -30,10 +50,10 @@ export function TenantExitButton({ compact }: { compact?: boolean }) {
     try {
       await fetch('/api/tenant/logout', { method: 'POST' })
     } catch {}
-    clearTenantName()
     try {
       await supabase()?.auth.signOut()
     } catch {}
+    clearTenantName()
     try {
       sessionStorage.clear()
     } catch {}
@@ -41,17 +61,32 @@ export function TenantExitButton({ compact }: { compact?: boolean }) {
   }
 
   if (!getTenantName() && meMode !== 'tenant') return null
+  const btn =
+    'flex w-full items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-medium text-muted-foreground hover:bg-sidebar-accent disabled:opacity-40'
   return (
-    <button
-      type="button"
-      onClick={() => void exit()}
-      disabled={busy}
-      title="Sair e apagar todos os meus dados"
-      aria-label="Sair e apagar todos os meus dados"
-      className="flex w-full items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-medium text-muted-foreground hover:bg-sidebar-accent hover:text-destructive disabled:opacity-40"
-    >
-      <SignOut className="size-4 shrink-0" />
-      {!compact && <span className="truncate">{busy ? 'Apagando…' : 'Sair e apagar tudo'}</span>}
-    </button>
+    <div className="flex w-full flex-col gap-0.5">
+      <button
+        type="button"
+        onClick={() => void logout()}
+        disabled={busy !== null}
+        title="Sair (mantém seus dados)"
+        aria-label="Sair (mantém seus dados)"
+        className={`${btn} hover:text-sidebar-accent-foreground`}
+      >
+        <SignOut className="size-4 shrink-0" />
+        {!compact && <span className="truncate">{busy === 'logout' ? 'Saindo…' : 'Sair'}</span>}
+      </button>
+      <button
+        type="button"
+        onClick={() => void wipe()}
+        disabled={busy !== null}
+        title="Apagar todos os meus dados"
+        aria-label="Apagar todos os meus dados"
+        className={`${btn} hover:text-destructive`}
+      >
+        <Trash className="size-4 shrink-0" />
+        {!compact && <span className="truncate">{busy === 'wipe' ? 'Apagando…' : 'Apagar tudo'}</span>}
+      </button>
+    </div>
   )
 }
