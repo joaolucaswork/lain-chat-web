@@ -179,7 +179,7 @@ export function TenantSettingsPage() {
             </p>
           </div>
 
-          <div className="flex flex-col gap-6 md:flex-row">
+          <div className="flex flex-col gap-6 md:flex-row md:gap-12">
             <nav
               aria-label="Seções da conta"
               className="flex shrink-0 gap-1 overflow-x-auto md:w-52 md:flex-col"
