@@ -2,7 +2,7 @@ import { Suspense, lazy, useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { RouteFallback } from '@/components/RouteFallback'
-import { TenantGate } from '@/components/TenantGate'
+import { AuthGate } from '@/components/AuthGate'
 import { Layout } from '@/pages/Layout'
 import { ChatPage } from '@/pages/ChatPage'
 import { MeContext, clearTenantName, getTenantName, useMe, useMeMode } from '@/hooks/useMe'
@@ -32,7 +32,7 @@ function DemoGate({ children }: { children: React.ReactNode }) {
   if (mode === 'unknown') return <RouteFallback variant="memories" />
   // owner (modo legado) nunca vê o gate; demo sem cookie vê; tenant entra direto.
   if (mode === 'demo' && !getTenantName()) {
-    return <TenantGate onDone={() => setTick((t) => t + 1)} />
+    return <AuthGate onDone={() => setTick((t) => t + 1)} />
   }
   return <MeContext.Provider value={mode}>{children}</MeContext.Provider>
 }

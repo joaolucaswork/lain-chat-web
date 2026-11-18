@@ -32,6 +32,8 @@ import { handleSessions } from './routes/sessions.ts';
 import { handleVault } from './routes/vault.ts';
 import { handleSettings } from './routes/settings.ts';
 import { handleTenant } from './routes/tenant.ts';
+import { handleAuth } from './routes/auth.ts';
+import { isSupabaseConfigured } from './lib/supabase.ts';
 
 loadSessionsFromDisk();
 
@@ -67,6 +69,7 @@ const server = Bun.serve({
       ?? (await handleVault(req, path))
       ?? (await handleSettings(req, path))
       ?? (await handleTenant(req, path))
+      ?? (await handleAuth(req, path))
       ?? json({ error: `unknown route: ${path}` }, 404);
   },
 });
@@ -87,4 +90,4 @@ function shutdownGracefully(signal: string) {
 process.on('SIGTERM', () => shutdownGracefully('SIGTERM'));
 process.on('SIGINT', () => shutdownGracefully('SIGINT'));
 
-console.log(`[lain-chat-bff] listening on http://${BIND_ADDR}:${PORT} (memory: ${MEMORY_URL}, llm: ${LLM_BASE})`);
+console.log(`[lain-chat-bff] listening on http://${BIND_ADDR}:${PORT} (memory: ${MEMORY_URL}, llm: ${LLM_BASE}, auth: ${isSupabaseConfigured() ? 'supabase' : 'legacy'})`);

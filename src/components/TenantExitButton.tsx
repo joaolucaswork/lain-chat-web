@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { SignOut } from '@phosphor-icons/react'
+import { supabase } from '@/lib/supabase'
 import { clearTenantName, getTenantName, useMeMode } from '@/hooks/useMe'
 
 /**
@@ -30,6 +31,9 @@ export function TenantExitButton({ compact }: { compact?: boolean }) {
       await fetch('/api/tenant/logout', { method: 'POST' })
     } catch {}
     clearTenantName()
+    try {
+      await supabase()?.auth.signOut()
+    } catch {}
     try {
       sessionStorage.clear()
     } catch {}

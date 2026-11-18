@@ -6,13 +6,18 @@
  */
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+// Síncrono de propósito: o carregamento async (Bun.file + await) criava uma
+// condição de corrida — módulos importados depois do config avaliavam seus
+// top-level `process.env` ANTES do .env terminar de carregar (modules
+// irmãos não esperam o top-level await). Sync = determinístico para todos.
+import { existsSync, readFileSync } from 'node:fs';
 
 const _dir = dirname(fileURLToPath(import.meta.url));
 
 try {
-  const envFile = Bun.file(join(_dir, '.env'));
-  if (await envFile.exists()) {
-    for (const line of (await envFile.text()).split('\n')) {
+  const envPath = join(_dir, '.env');
+  if (existsSync(envPath)) {
+    for (const line of readFileSync(envPath, 'utf8').split('\n')) {
       const t = line.trim();
       if (!t || t.startsWith('#')) continue;
       const eq = t.indexOf('=');
