@@ -50,7 +50,8 @@ export async function handleTenant(req: Request, path: string): Promise<Response
     try {
       const res = await fetch(`${MEMORY_URL}/api/tenant/mcp-token`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${key}` },
+        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+        body: '{}', // o upstream exige body JSON em todo POST
         signal: AbortSignal.timeout(15_000),
       });
       const data = await res.json().catch(() => ({}));
