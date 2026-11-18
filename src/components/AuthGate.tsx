@@ -276,7 +276,7 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
                 {[
                   'Memória isolada só sua, em todos os devices.',
                   'Lembretes e contexto que atravessam sessões.',
-                  'Apague tudo quando quiser, com sua senha.',
+                  'Você pode apagar tudo quando quiser.',
                 ].map((perk) => (
                   <div key={perk} className="flex gap-2">
                     <CheckCircle className="mt-0.5 size-5 shrink-0 text-neutral-700" />

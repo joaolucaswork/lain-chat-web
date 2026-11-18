@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import { Eye, EyeSlash, List } from '@phosphor-icons/react'
+import { List } from '@phosphor-icons/react'
 import type { LayoutContext } from './Layout'
 import { useTheme, type ThemeMode } from '@/hooks/useTheme'
 import { getTenantName, setTenantName, clearTenantName } from '@/hooks/useMe'
@@ -36,12 +36,14 @@ export function TenantSettingsPage() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
-  // Modal de confirmação do wipe: revalida a senha no Supabase antes de apagar.
+  // Modal de confirmação do wipe: via única para login com senha e com Google —
+  // digitar APAGAR libera o botão. Um caminho só, sem bifurcar por provedor.
+  const WIPE_WORD = 'APAGAR'
   const [wipeOpen, setWipeOpen] = useState(false)
-  const [wipePassword, setWipePassword] = useState('')
-  const [wipeShowPassword, setWipeShowPassword] = useState(false)
+  const [wipeConfirm, setWipeConfirm] = useState('')
   const [wipeBusy, setWipeBusy] = useState(false)
   const [wipeError, setWipeError] = useState('')
+  const wipeReady = wipeConfirm.trim().toUpperCase() === WIPE_WORD
 
   useEffect(() => {
     let alive = true
@@ -104,41 +106,21 @@ export function TenantSettingsPage() {
 
   /**
    * Wipe LGPD: memórias + grafo + conversas do visitante. A conta continua —
-   * entrar de novo começa do zero. Sem undo. A senha é revalidada no Supabase
-   * dentro do modal antes de apagar (contas Google não têm senha — nesse caso
-   * o Supabase recusa e o modal mostra como entrar para definir uma).
+   * entrar de novo começa do zero. Sem undo. O modal exige digitar APAGAR
+   * (padrão GitHub/Vercell para ação destrutiva; funciona igual para login
+   * com senha e com Google, sem bifurcar o fluxo por provedor).
    */
   function openWipe() {
-    setWipePassword('')
-    setWipeShowPassword(false)
+    setWipeConfirm('')
     setWipeError('')
     setWipeOpen(true)
   }
 
   async function confirmWipe() {
-    if (wipeBusy) return
-    if (wipePassword.length < 6) {
-      setWipeError('Informe sua senha (mín. 6 caracteres).')
-      return
-    }
-    const client = supabase()
-    if (!client) {
-      setWipeError('Login indisponível. Tente de novo.')
-      return
-    }
+    if (wipeBusy || !wipeReady) return
     setWipeBusy(true)
     setWipeError('')
     try {
-      // Revalida que é o dono da conta antes de destruir os dados.
-      const { error: authError } = await client.auth.signInWithPassword({
-        email: email.trim(),
-        password: wipePassword,
-      })
-      if (authError) {
-        setWipeError('Senha incorreta. Tente de novo.')
-        setWipeBusy(false)
-        return
-      }
       const res = await fetch('/api/tenant/data', { method: 'DELETE' })
       if (!res.ok) {
         setWipeError('Não foi possível apagar. Tente de novo.')
@@ -301,25 +283,19 @@ export function TenantSettingsPage() {
             <p className="truncate rounded-lg border border-border/60 bg-muted px-4 py-2 text-[13px] text-muted-foreground">
               {email || '…'}
             </p>
-            <div className="relative">
+            <div>
               <input
-                value={wipePassword}
-                onChange={(e) => setWipePassword(e.target.value)}
-                placeholder="Sua senha"
-                type={wipeShowPassword ? 'text' : 'password'}
-                autoComplete="current-password"
+                value={wipeConfirm}
+                onChange={(e) => setWipeConfirm(e.target.value)}
+                placeholder={`Digite ${WIPE_WORD} para confirmar`}
+                autoComplete="off"
                 autoFocus
                 disabled={wipeBusy}
-                className="w-full rounded-lg border border-border/60 bg-background px-4 py-2 pr-11 text-[13px] outline-none transition-shadow duration-200 focus-visible:ring-2 focus-visible:ring-foreground/20 disabled:opacity-40"
+                className="w-full rounded-lg border border-border/60 bg-background px-4 py-2 text-[13px] outline-none transition-shadow duration-200 focus-visible:ring-2 focus-visible:ring-foreground/20 disabled:opacity-40"
               />
-              <button
-                type="button"
-                onClick={() => setWipeShowPassword((v) => !v)}
-                aria-label={wipeShowPassword ? 'Ocultar senha' : 'Mostrar senha'}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-muted-foreground"
-              >
-                {wipeShowPassword ? <EyeSlash className="size-4" /> : <Eye className="size-4" />}
-              </button>
+              <p className="pt-1 text-xs text-muted-foreground">
+                Digite {WIPE_WORD} em maiúsculas para liberar o botão.
+              </p>
             </div>
             {wipeError && <p className="text-sm text-destructive">{wipeError}</p>}
             <DialogFooter>
@@ -333,7 +309,7 @@ export function TenantSettingsPage() {
               </button>
               <button
                 type="submit"
-                disabled={wipeBusy}
+                disabled={wipeBusy || !wipeReady}
                 className="rounded-lg bg-destructive px-3 py-1.5 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-40"
               >
                 {wipeBusy ? 'Apagando…' : 'Apagar tudo'}
