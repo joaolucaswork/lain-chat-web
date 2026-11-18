@@ -121,7 +121,7 @@ export function TenantSettingsPage() {
                   placeholder="Seu nome"
                   maxLength={40}
                   autoComplete="nickname"
-                  className="w-64 rounded-lg border border-border/60 bg-background px-4 py-2 text-[13px] outline-none focus:border-muted-foreground"
+                  className="w-64 rounded-lg border border-border/60 bg-background px-4 py-2 text-[13px] outline-none transition-shadow duration-200 focus-visible:ring-2 focus-visible:ring-foreground/20 focus-visible:ring-offset-2 focus-visible:ring-offset-card"
                 />
               </div>
               <div className={row}>
