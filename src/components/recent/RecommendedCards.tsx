@@ -29,8 +29,8 @@ const CARDS: RecommendedCard[] = [
   {
     eyebrow: 'Memória automática',
     title: 'Fale normal, ela guarda o essencial',
-    desc: 'A Lain extrai fatos do que você diz. Quer garantir? Diga “lembre que…” e ela salva na hora.',
-    prompt: 'Lembre que trabalho com design, tomo café coado sem açúcar e estou focando em dormir mais cedo.',
+    desc: 'A Lain extrai fatos sozinha do que você diz — sem comando, sem “lembre que”. É só conversar.',
+    prompt: 'Trabalho com design, tomo café coado sem açúcar e tô tentando dormir mais cedo.',
     pill: 'Salvar exemplo',
     count: '2 de 3',
     visual: 'capture',
@@ -48,7 +48,7 @@ const CARDS: RecommendedCard[] = [
 
 function Visual({ kind }: { kind: RecommendedCard['visual'] }) {
   if (kind === 'capture') {
-    // Chat dizendo "lembre que..." virando memória salva.
+    // Chat normal virando memória salva.
     return (
       <div className="relative h-[110px] overflow-hidden rounded-lg bg-[#2f6bff] dark:bg-[#2f6bff]/90">
         <div className="absolute -top-6 -right-6 size-28 rounded-full bg-white/15" />
@@ -57,7 +57,7 @@ function Visual({ kind }: { kind: RecommendedCard['visual'] }) {
             <span className="flex size-4 items-center justify-center rounded-full bg-[#2f6bff]/10">
               <Brain className="size-3 text-[#2f6bff]" weight="bold" />
             </span>
-            <div className="h-1.5 w-20 rounded-full bg-neutral-900 text-[0px]">lembre que…</div>
+            <div className="h-1.5 w-20 rounded-full bg-neutral-900 text-[0px]">café coado…</div>
           </div>
           <div className="space-y-1">
             <div className="h-1.5 w-full rounded-full bg-muted" />
