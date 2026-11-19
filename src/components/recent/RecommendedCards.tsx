@@ -48,27 +48,27 @@ const CARDS: RecommendedCard[] = [
 
 function Visual({ kind }: { kind: RecommendedCard['visual'] }) {
   if (kind === 'capture') {
-    // Chat normal virando memória salva.
+    // Chat normal virando memória salva (bolha = token do chat).
     return (
-      <div className="relative h-[110px] overflow-hidden rounded-lg bg-[#2f6bff] dark:bg-[#2f6bff]/90">
-        <div className="absolute -top-6 -right-6 size-28 rounded-full bg-white/15" />
-        <div className="absolute top-3 left-3 w-[68%] rounded-md bg-white p-2 shadow-sm">
+      <div className="relative h-[110px] overflow-hidden rounded-lg bg-muted dark:bg-muted/60">
+        <div className="absolute -top-6 -right-6 size-28 rounded-full bg-primary/10" />
+        <div className="absolute top-3 left-3 w-[68%] rounded-md bg-primary p-2 text-primary-foreground shadow-sm">
           <div className="mb-1.5 flex items-center gap-1.5">
-            <span className="flex size-4 items-center justify-center rounded-full bg-[#2f6bff]/10">
-              <Brain className="size-3 text-[#2f6bff]" weight="bold" />
+            <span className="flex size-4 items-center justify-center rounded-full bg-primary-foreground/20">
+              <Brain className="size-3" weight="bold" />
             </span>
-            <div className="h-1.5 w-20 rounded-full bg-neutral-900 text-[0px]">café coado…</div>
+            <div className="truncate text-[0px]">café coado…</div>
           </div>
           <div className="space-y-1">
-            <div className="h-1.5 w-full rounded-full bg-muted" />
-            <div className="h-1.5 w-4/5 rounded-full bg-muted" />
+            <div className="h-1.5 w-full rounded-full bg-primary-foreground/30" />
+            <div className="h-1.5 w-4/5 rounded-full bg-primary-foreground/30" />
           </div>
         </div>
-        <div className="absolute right-3 bottom-3 flex items-center gap-1.5 rounded-full bg-white py-1 pr-2.5 pl-1 shadow-sm">
+        <div className="absolute right-3 bottom-3 flex items-center gap-1.5 rounded-full bg-card py-1 pr-2.5 pl-1 shadow-sm">
           <span className="flex size-4 items-center justify-center rounded-full bg-emerald-500">
             <Check className="size-3 text-white" weight="bold" />
           </span>
-          <span className="text-[10px] font-semibold text-neutral-900">salvo na memória</span>
+          <span className="text-[10px] font-semibold text-card-foreground">salvo na memória</span>
         </div>
       </div>
     )
@@ -76,18 +76,18 @@ function Visual({ kind }: { kind: RecommendedCard['visual'] }) {
   if (kind === 'recall') {
     // Resposta com chips de contexto puxados do grafo.
     return (
-      <div className="relative flex h-[110px] items-center justify-center overflow-hidden rounded-lg bg-[#3ddc84] dark:bg-[#22c55e]/80">
-        <div className="absolute -top-10 -left-10 size-32 rounded-full bg-white/20" />
-        <div className="absolute -right-8 -bottom-10 size-28 rounded-full bg-emerald-700/15" />
-        <div className="relative w-[74%] rounded-lg bg-white p-2.5 shadow-sm">
+      <div className="relative flex h-[110px] items-center justify-center overflow-hidden rounded-lg bg-muted dark:bg-muted/60">
+        <div className="absolute -top-10 -left-10 size-32 rounded-full bg-primary/10" />
+        <div className="absolute -right-8 -bottom-10 size-28 rounded-full bg-primary/5" />
+        <div className="relative w-[74%] rounded-lg bg-card p-2.5 shadow-sm">
           <div className="mb-1.5 flex gap-1">
-            <span className="rounded-full bg-[#2f6bff]/10 px-1.5 py-0.5 text-[9px] font-semibold text-[#2f6bff]">
+            <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-semibold text-primary">
               rotina
             </span>
-            <span className="rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-700">
+            <span className="rounded-full bg-accent px-1.5 py-0.5 text-[9px] font-semibold text-accent-foreground">
               projeto
             </span>
-            <Sparkle className="ml-auto size-3.5 text-[#2f6bff]" weight="fill" />
+            <Sparkle className="ml-auto size-3.5 text-primary" weight="fill" />
           </div>
           <div className="space-y-1">
             <div className="h-1.5 w-full rounded-full bg-muted" />
@@ -98,22 +98,22 @@ function Visual({ kind }: { kind: RecommendedCard['visual'] }) {
       </div>
     )
   }
-  // MCP: bloco de terminal com o server + badge de plug.
+  // MCP: bloco de terminal com o server + badge de plug (tokens, sem hex fixo).
   return (
-    <div className="relative flex h-[110px] flex-col overflow-hidden rounded-lg bg-[#0f1420] p-3 dark:bg-black/60">
+    <div className="relative flex h-[110px] flex-col overflow-hidden rounded-lg bg-muted p-3 dark:bg-muted/60">
       <div className="mb-2 flex items-center gap-1">
         <span className="size-2 rounded-full bg-[#ff5f57]" />
         <span className="size-2 rounded-full bg-[#febc2e]" />
         <span className="size-2 rounded-full bg-[#28c840]" />
-        <span className="ml-1 text-[9px] font-medium text-white/50">lain-memory · mcp</span>
+        <span className="ml-1 text-[9px] font-medium text-muted-foreground">lain-memory · mcp</span>
       </div>
       <div className="space-y-1 font-mono text-[9px] leading-relaxed">
-        <div className="truncate text-emerald-400">$ bun run <span className="text-white">mcp</span></div>
-        <div className="truncate text-white/60">tools: remember · recall · forget</div>
-        <div className="truncate text-white/60">graph_query · seed_extract · +8</div>
+        <div className="truncate text-primary">$ bun run <span className="text-foreground">mcp</span></div>
+        <div className="truncate text-muted-foreground">tools: remember · recall · forget</div>
+        <div className="truncate text-muted-foreground">graph_query · seed_extract · +8</div>
       </div>
-      <span className="absolute right-2.5 bottom-2.5 flex size-7 items-center justify-center rounded-full bg-[#2f6bff]">
-        <Plug className="size-4 text-white" weight="bold" />
+      <span className="absolute right-2.5 bottom-2.5 flex size-7 items-center justify-center rounded-full bg-primary">
+        <Plug className="size-4 text-primary-foreground" weight="bold" />
       </span>
     </div>
   )
