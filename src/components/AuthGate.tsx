@@ -89,6 +89,33 @@ function GoogleLogo({ className = 'size-5' }: { className?: string }) {
   )
 }
 
+/** Traduz erros do Supabase Auth (em inglês) para mensagens amigáveis em PT. */
+function friendlyAuthError(raw: string): string {
+  const m = (raw || '').toLowerCase()
+  if (m.includes('invalid login credentials')) return 'Senha incorreta. Tente de novo.'
+  if (m.includes('email not confirmed')) return 'Confirme seu email antes de entrar.'
+  if (
+    m.includes('user already registered') ||
+    m.includes('already been registered') ||
+    m.includes('already exists')
+  )
+    return 'Essa conta já existe. Entre com sua senha.'
+  if (m.includes('token has expired') || m.includes('otp has expired') || m.includes('otp expired'))
+    return 'Código expirado. Peça um novo código.'
+  if (
+    m.includes('token is invalid') ||
+    m.includes('invalid token') ||
+    m.includes('invalid otp') ||
+    m.includes('invalid code')
+  )
+    return 'Código inválido. Confira e tente de novo.'
+  if (m.includes('rate limit') || m.includes('too many') || m.includes('over email'))
+    return 'Muitas tentativas. Aguarde um pouco e tente de novo.'
+  if (m.includes('password should be')) return 'A senha precisa ter pelo menos 6 caracteres.'
+  if (m.includes('unable to validate email')) return 'Informe um email válido.'
+  return raw
+}
+
 export function AuthGate({ onDone }: { onDone: () => void }) {
   const [step, setStep] = useState<1 | 2>(1)
   const [email, setEmail] = useState('')
@@ -203,7 +230,7 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
         options: { shouldCreateUser: exists !== true },
       })
       if (error) {
-        setError(error.message)
+        setError(friendlyAuthError(error.message))
         return
       }
       setOtpSent(true)
@@ -233,7 +260,7 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
         type: 'email',
       })
       if (error) {
-        setError(error.message)
+        setError(friendlyAuthError(error.message))
         return
       }
       if (!data.session) {
@@ -280,7 +307,7 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
           options: { data: { display_name: name.trim().slice(0, 40) } },
         })
         if (error) {
-          setError(error.message)
+          setError(friendlyAuthError(error.message))
           return
         }
         if (!data.session) {
@@ -295,7 +322,7 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
       } else {
         const { data, error } = await client.auth.signInWithPassword({ email: cleanEmail, password })
         if (error) {
-          setError(error.message)
+          setError(friendlyAuthError(error.message))
           return
         }
         if (!data.session) {
@@ -319,7 +346,7 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
         provider: 'google',
         options: { redirectTo: window.location.origin },
       })
-      if (error) setError(error.message)
+      if (error) setError(friendlyAuthError(error.message))
       // Sucesso = redirect; o exchange acontece na volta (useEffect).
     } finally {
       setBusy(false)
