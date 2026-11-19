@@ -230,7 +230,7 @@ export function Layout() {
           label="Guia de instalação"
           active={location.pathname.startsWith('/docs')}
         >
-          <BookOpen className="size-5" weight="regular" />
+          <BookOpen className="size-5" weight="bold" />
         </IconRailLink>
 
         {isTenant ? (
