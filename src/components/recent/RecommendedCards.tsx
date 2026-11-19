@@ -17,28 +17,24 @@ interface RecommendedCard {
   visual: 'capture' | 'recall' | 'mcp'
 }
 
-// WHY: o texto copiado espelha o setup.sh do lain-memory (trechos OpenCode
-// + Claude Code + remoto) — caminhos variam por máquina, então usa
-// placeholders e aponta o ./setup.sh que imprime com os caminhos reais.
-const MCP_COPY_TEXT = `Lain MCP — 13 tools (remember, recall, forget, update_memory, list_memories, scan_memories, bundle_diario, graph_query, graph_stats, pgs_query, pgs_stats, seed_extract, list_seeds)
+// WHY: espelha o fluxo atual do setup.sh — remoto primeiro (2 comandos, sem
+// Docker), local com --wire. Sem snippets manuais de JSON: o setup escreve
+// as entradas via CLI oficial (opencode mcp add / claude mcp add).
+const MCP_COPY_TEXT = `Lain MCP — 13 tools, mesma surface no stdio e no remoto
+(remember, recall, forget, update_memory, list_memories, scan_memories,
+bundle_diario, graph_query, graph_stats, pgs_query, pgs_stats, seed_extract,
+list_seeds)
 
-— OpenCode (~/.config/opencode/opencode.jsonc) —
-"lain_memory": {
-  "type": "local",
-  "command": ["bun", "run", "--cwd", "<caminho-do-lain-memory>", "mcp"],
-  "enabled": true,
-  "environment": { "LAIN_WORKSPACE_DIR": "<mesmo-do-.env>" },
-  "timeout": 120000
-}
+— Conta remota (2 comandos, sem Docker nem LLM key) —
+git clone https://github.com/joaolucaswork/lain-memory && cd lain-memory
+./setup.sh --remote --yes
+(cria a conta, minta o token e escreve lain-remote no OpenCode/Claude)
 
-— Claude Code —
-claude mcp add lain-memory --env LAIN_WORKSPACE_DIR=<mesmo-do-.env> -- bun run --cwd <caminho-do-lain-memory> mcp
+— Local (self-host: Docker + LLM key, dados na sua máquina) —
+./setup.sh --wire --yes
 
-— Remoto, qualquer client MCP —
-POST https://<sua-api>/mcp + Authorization: Bearer <sua-chave>
-(stateless, por tenant; mesma surface do stdio)
-
-Dica: rode ./setup.sh dentro do lain-memory — ele imprime esses trechos com seus caminhos. Timeout 120s recomendado (remember/pgs encadeiam LLMs).`
+Verificar depois: ./setup.sh --doctor [--remote]
+Re-run --remote rotaciona o token; a chave da conta fica em ~/.config/lain/token (0600).`
 
 const CARDS: RecommendedCard[] = [
   {
