@@ -19,6 +19,9 @@ const SettingsPage = lazy(() =>
 const TenantSettingsPage = lazy(() =>
   import('@/pages/TenantSettingsPage').then((m) => ({ default: m.TenantSettingsPage })),
 )
+const DocsInstallPage = lazy(() =>
+  import('@/pages/DocsInstallPage').then((m) => ({ default: m.DocsInstallPage })),
+)
 
 function DemoGate({ children }: { children: React.ReactNode }) {
   const mode = useMe()
@@ -79,6 +82,14 @@ export default function App() {
                 element={
                   <Suspense fallback={<RouteFallback variant="settings" />}>
                     <TenantAccountGuard />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/docs/instalacao"
+                element={
+                  <Suspense fallback={<RouteFallback variant="blank" />}>
+                    <DocsInstallPage />
                   </Suspense>
                 }
               />

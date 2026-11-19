@@ -1,6 +1,6 @@
 import { motion } from 'motion/react'
-import { useState } from 'react'
-import { Plus, Brain, Sparkle, Check, Plug, Copy } from '@phosphor-icons/react'
+import { useNavigate } from 'react-router-dom'
+import { Plus, Brain, Sparkle, ArrowUpRight, Check, Plug } from '@phosphor-icons/react'
 import { Skeleton } from '@/components/ui/skeleton'
 
 interface RecommendedCard {
@@ -9,41 +9,20 @@ interface RecommendedCard {
   desc: string
   /** Prefill do composer (cards 1-2). */
   prompt?: string
-  /** Quando presente, o clique copia em vez de preencher (card MCP). */
-  copyText?: string
+  /** Quando presente, o clique navega em vez de preencher (card MCP). */
+  href?: string
   pill: string
-  pillCopied?: string
   count: string
   visual: 'capture' | 'recall' | 'mcp'
 }
-
-// WHY: espelha o fluxo atual do setup.sh — remoto primeiro (2 comandos, sem
-// Docker), local com --wire. Sem snippets manuais de JSON: o setup escreve
-// as entradas via CLI oficial (opencode mcp add / claude mcp add).
-const MCP_COPY_TEXT = `Lain MCP — 13 tools, mesma surface no stdio e no remoto
-(remember, recall, forget, update_memory, list_memories, scan_memories,
-bundle_diario, graph_query, graph_stats, pgs_query, pgs_stats, seed_extract,
-list_seeds)
-
-— Conta remota (2 comandos, sem Docker nem LLM key) —
-git clone https://github.com/joaolucaswork/lain-memory && cd lain-memory
-./setup.sh --remote --yes
-(cria a conta, minta o token e escreve lain-remote no OpenCode/Claude)
-
-— Local (self-host: Docker + LLM key, dados na sua máquina) —
-./setup.sh --wire --yes
-
-Verificar depois: ./setup.sh --doctor [--remote]
-Re-run --remote rotaciona o token; a chave da conta fica em ~/.config/lain/token (0600).`
 
 const CARDS: RecommendedCard[] = [
   {
     eyebrow: 'MCP universal',
     title: 'Leve sua memória pra qualquer agente',
     desc: 'Conecte o lain-memory via MCP no Claude Code, OpenCode ou Cursor — recall, remember e grafo com os mesmos fatos das conversas.',
-    copyText: MCP_COPY_TEXT,
-    pill: 'Copiar config',
-    pillCopied: 'Copiado!',
+    href: '/docs/instalacao',
+    pill: 'Ver guia',
     count: '1 de 3',
     visual: 'mcp',
   },
@@ -193,24 +172,12 @@ export function RecommendedCardsSkeleton() {
 
 /** Estado vazio da home: explica o Lain em 3 cards clicáveis (estilo onboarding). */
 export function RecommendedCards() {
-  const [copiedIdx, setCopiedIdx] = useState<number | null>(null)
+  const navigate = useNavigate()
 
-  const handleClick = async (c: RecommendedCard, idx: number) => {
-    // Card MCP: copia o snippet de conexão em vez de preencher o composer.
-    if (c.copyText) {
-      try {
-        await navigator.clipboard.writeText(c.copyText)
-      } catch {
-        // Fallback p/ contextos sem Clipboard API (http, webview antiga).
-        const ta = document.createElement('textarea')
-        ta.value = c.copyText
-        document.body.appendChild(ta)
-        ta.select()
-        document.execCommand('copy')
-        ta.remove()
-      }
-      setCopiedIdx(idx)
-      window.setTimeout(() => setCopiedIdx((cur) => (cur === idx ? null : cur)), 2000)
+  const handleClick = (c: RecommendedCard) => {
+    // Card MCP: abre o guia em vez de preencher o composer.
+    if (c.href) {
+      navigate(c.href)
       return
     }
     if (c.prompt) {
@@ -229,13 +196,12 @@ export function RecommendedCards() {
       <h2 className="mb-3 text-left text-[15px] font-bold tracking-tight">Comece com a Lain</h2>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {CARDS.map((c, i) => {
-          const copied = copiedIdx === i
           return (
           <motion.button
             key={c.title}
             type="button"
-            onClick={() => void handleClick(c, i)}
-            title={c.copyText ? 'Copiar configuração MCP' : 'Usar exemplo'}
+            onClick={() => handleClick(c)}
+            title={c.href ? 'Abrir guia de instalação' : 'Usar exemplo'}
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.45, delay: 0.08 + i * 0.08, ease: [0.22, 1, 0.36, 1] }}
@@ -245,18 +211,18 @@ export function RecommendedCards() {
               <span className="truncate text-xs text-muted-foreground">{c.eyebrow}</span>
               <span
                 role="button"
-                aria-label={c.copyText ? `Copiar configuração: ${c.title}` : `Usar exemplo: ${c.title}`}
+                aria-label={c.href ? `Abrir guia: ${c.title}` : `Usar exemplo: ${c.title}`}
                 className="flex size-6 shrink-0 items-center justify-center rounded-md transition-colors group-hover:bg-accent"
               >
-                {copied ? <Check className="size-4 text-emerald-500" weight="bold" /> : c.copyText ? <Copy className="size-4" /> : <Plus className="size-4" />}
+                {c.href ? <ArrowUpRight className="size-4" /> : <Plus className="size-4" />}
               </span>
             </div>
             <Visual kind={c.visual} />
             <div className="mt-3 line-clamp-2 min-h-[42px] text-[15px] leading-snug font-bold text-foreground">{c.title}</div>
             <p className="mt-1 line-clamp-4 min-h-[84px] text-[13px] leading-relaxed text-muted-foreground">{c.desc}</p>
             <div className="mt-auto flex items-center justify-between gap-2 pt-4">
-              <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${copied ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : 'bg-muted text-foreground'}`}>
-                {copied ? (c.pillCopied ?? 'Copiado!') : c.pill}
+              <span className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-foreground">
+                {c.pill}
               </span>
               <span className="text-[11px] text-muted-foreground">{c.count}</span>
             </div>
