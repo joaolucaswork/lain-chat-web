@@ -89,7 +89,7 @@ export function ChatInput({ onSend, onStop, disabled, placeholder = 'Envie uma m
               <InputGroupButton
                 size="icon-sm"
                 variant="secondary"
-                className="cursor-pointer rounded-full bg-background shadow-sm dark:bg-secondary dark:shadow-none"
+                className="cursor-pointer rounded-full bg-background shadow-sm disabled:cursor-default disabled:opacity-30 disabled:shadow-none dark:bg-secondary dark:shadow-none"
                 onClick={handleSend}
                 disabled={disabled || !text.trim()}
                 title="Enviar"
