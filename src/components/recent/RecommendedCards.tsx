@@ -1,25 +1,63 @@
 import { motion } from 'motion/react'
-import { Plus, Brain, Sparkle, Database, Check } from '@phosphor-icons/react'
+import { useState } from 'react'
+import { Plus, Brain, Sparkle, Check, Plug, Copy } from '@phosphor-icons/react'
 import { Skeleton } from '@/components/ui/skeleton'
 
 interface RecommendedCard {
   eyebrow: string
   title: string
   desc: string
-  prompt: string
+  /** Prefill do composer (cards 1-2). */
+  prompt?: string
+  /** Quando presente, o clique copia em vez de preencher (card MCP). */
+  copyText?: string
   pill: string
+  pillCopied?: string
   count: string
-  visual: 'capture' | 'recall' | 'vault'
+  visual: 'capture' | 'recall' | 'mcp'
 }
 
+// WHY: o texto copiado espelha o setup.sh do lain-memory (trechos OpenCode
+// + Claude Code + remoto) — caminhos variam por máquina, então usa
+// placeholders e aponta o ./setup.sh que imprime com os caminhos reais.
+const MCP_COPY_TEXT = `Lain MCP — 13 tools (remember, recall, forget, update_memory, list_memories, scan_memories, bundle_diario, graph_query, graph_stats, pgs_query, pgs_stats, seed_extract, list_seeds)
+
+— OpenCode (~/.config/opencode/opencode.jsonc) —
+"lain_memory": {
+  "type": "local",
+  "command": ["bun", "run", "--cwd", "<caminho-do-lain-memory>", "mcp"],
+  "enabled": true,
+  "environment": { "LAIN_WORKSPACE_DIR": "<mesmo-do-.env>" },
+  "timeout": 120000
+}
+
+— Claude Code —
+claude mcp add lain-memory --env LAIN_WORKSPACE_DIR=<mesmo-do-.env> -- bun run --cwd <caminho-do-lain-memory> mcp
+
+— Remoto, qualquer client MCP —
+POST https://<sua-api>/mcp + Authorization: Bearer <sua-chave>
+(stateless, por tenant; mesma surface do stdio)
+
+Dica: rode ./setup.sh dentro do lain-memory — ele imprime esses trechos com seus caminhos. Timeout 120s recomendado (remember/pgs encadeiam LLMs).`
+
 const CARDS: RecommendedCard[] = [
+  {
+    eyebrow: 'MCP universal',
+    title: 'Leve sua memória pra qualquer agente',
+    desc: 'Conecte o lain-memory via MCP no Claude Code, OpenCode ou Cursor — recall, remember e grafo com os mesmos fatos das conversas.',
+    copyText: MCP_COPY_TEXT,
+    pill: 'Copiar config',
+    pillCopied: 'Copiado!',
+    count: '1 de 3',
+    visual: 'mcp',
+  },
   {
     eyebrow: 'Memória automática',
     title: 'Fale normal, ela guarda o essencial',
     desc: 'A Lain extrai fatos do que você diz. Quer garantir? Diga “lembre que…” e ela salva na hora.',
     prompt: 'Lembre que trabalho com design, tomo café coado sem açúcar e estou focando em dormir mais cedo.',
     pill: 'Salvar exemplo',
-    count: '1 de 3',
+    count: '2 de 3',
     visual: 'capture',
   },
   {
@@ -28,17 +66,8 @@ const CARDS: RecommendedCard[] = [
     desc: 'Antes de responder, ela busca memórias e conexões no grafo — sem você repetir tudo.',
     prompt: 'Com base no que você sabe sobre mim, por onde devo começar hoje?',
     pill: 'Testar recall',
-    count: '2 de 3',
-    visual: 'recall',
-  },
-  {
-    eyebrow: 'Cofre sob controle',
-    title: 'Tudo revisável e apagável',
-    desc: 'Consulte no chat ou no Cofre: confirme, arquive ou peça para esquecer quando quiser.',
-    prompt: 'O que você sabe sobre mim até agora?',
-    pill: 'Consultar cofre',
     count: '3 de 3',
-    visual: 'vault',
+    visual: 'recall',
   },
 ]
 
@@ -94,23 +123,23 @@ function Visual({ kind }: { kind: RecommendedCard['visual'] }) {
       </div>
     )
   }
-  // Cofre: pilha de memórias com tags, revisável.
+  // MCP: bloco de terminal com o server + badge de plug.
   return (
-    <div className="relative flex h-[110px] flex-col justify-center gap-1.5 overflow-hidden rounded-lg bg-[#e9eefb] p-3 dark:bg-muted">
-      <div className="flex items-center gap-2 rounded-md bg-white px-2 py-1.5 shadow-sm dark:bg-background">
-        <Database className="size-3.5 shrink-0 text-[#2f6bff]" weight="bold" />
-        <div className="h-1.5 flex-1 rounded-full bg-muted" />
-        <span className="rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground">
-          #trabalho
-        </span>
+    <div className="relative flex h-[110px] flex-col overflow-hidden rounded-lg bg-[#0f1420] p-3 dark:bg-black/60">
+      <div className="mb-2 flex items-center gap-1">
+        <span className="size-2 rounded-full bg-[#ff5f57]" />
+        <span className="size-2 rounded-full bg-[#febc2e]" />
+        <span className="size-2 rounded-full bg-[#28c840]" />
+        <span className="ml-1 text-[9px] font-medium text-white/50">lain-memory · mcp</span>
       </div>
-      <div className="ml-4 flex items-center gap-2 rounded-md bg-white px-2 py-1.5 opacity-80 shadow-sm dark:bg-background">
-        <Database className="size-3.5 shrink-0 text-muted-foreground" weight="bold" />
-        <div className="h-1.5 flex-1 rounded-full bg-muted" />
-        <span className="rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground">
-          #rotina
-        </span>
+      <div className="space-y-1 font-mono text-[9px] leading-relaxed">
+        <div className="truncate text-emerald-400">$ bun run <span className="text-white">mcp</span></div>
+        <div className="truncate text-white/60">tools: remember · recall · forget</div>
+        <div className="truncate text-white/60">graph_query · seed_extract · +8</div>
       </div>
+      <span className="absolute right-2.5 bottom-2.5 flex size-7 items-center justify-center rounded-full bg-[#2f6bff]">
+        <Plug className="size-4 text-white" weight="bold" />
+      </span>
     </div>
   )
 }
@@ -168,8 +197,29 @@ export function RecommendedCardsSkeleton() {
 
 /** Estado vazio da home: explica o Lain em 3 cards clicáveis (estilo onboarding). */
 export function RecommendedCards() {
-  const prefill = (prompt: string) => {
-    window.dispatchEvent(new CustomEvent<string>('lain:prefill-composer', { detail: prompt }))
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null)
+
+  const handleClick = async (c: RecommendedCard, idx: number) => {
+    // Card MCP: copia o snippet de conexão em vez de preencher o composer.
+    if (c.copyText) {
+      try {
+        await navigator.clipboard.writeText(c.copyText)
+      } catch {
+        // Fallback p/ contextos sem Clipboard API (http, webview antiga).
+        const ta = document.createElement('textarea')
+        ta.value = c.copyText
+        document.body.appendChild(ta)
+        ta.select()
+        document.execCommand('copy')
+        ta.remove()
+      }
+      setCopiedIdx(idx)
+      window.setTimeout(() => setCopiedIdx((cur) => (cur === idx ? null : cur)), 2000)
+      return
+    }
+    if (c.prompt) {
+      window.dispatchEvent(new CustomEvent<string>('lain:prefill-composer', { detail: c.prompt }))
+    }
   }
 
   return (
@@ -182,12 +232,14 @@ export function RecommendedCards() {
     >
       <h2 className="mb-3 text-left text-[15px] font-bold tracking-tight">Comece com a Lain</h2>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {CARDS.map((c, i) => (
+        {CARDS.map((c, i) => {
+          const copied = copiedIdx === i
+          return (
           <motion.button
             key={c.title}
             type="button"
-            onClick={() => prefill(c.prompt)}
-            title="Usar exemplo"
+            onClick={() => void handleClick(c, i)}
+            title={c.copyText ? 'Copiar configuração MCP' : 'Usar exemplo'}
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.45, delay: 0.08 + i * 0.08, ease: [0.22, 1, 0.36, 1] }}
@@ -197,23 +249,24 @@ export function RecommendedCards() {
               <span className="truncate text-xs text-muted-foreground">{c.eyebrow}</span>
               <span
                 role="button"
-                aria-label={`Usar exemplo: ${c.title}`}
+                aria-label={c.copyText ? `Copiar configuração: ${c.title}` : `Usar exemplo: ${c.title}`}
                 className="flex size-6 shrink-0 items-center justify-center rounded-md transition-colors group-hover:bg-accent"
               >
-                <Plus className="size-4" />
+                {copied ? <Check className="size-4 text-emerald-500" weight="bold" /> : c.copyText ? <Copy className="size-4" /> : <Plus className="size-4" />}
               </span>
             </div>
             <Visual kind={c.visual} />
             <div className="mt-3 line-clamp-2 min-h-[42px] text-[15px] leading-snug font-bold text-foreground">{c.title}</div>
             <p className="mt-1 line-clamp-4 min-h-[84px] text-[13px] leading-relaxed text-muted-foreground">{c.desc}</p>
             <div className="mt-auto flex items-center justify-between gap-2 pt-4">
-              <span className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-foreground">
-                {c.pill}
+              <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${copied ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : 'bg-muted text-foreground'}`}>
+                {copied ? (c.pillCopied ?? 'Copiado!') : c.pill}
               </span>
               <span className="text-[11px] text-muted-foreground">{c.count}</span>
             </div>
           </motion.button>
-        ))}
+          )
+        })}
       </div>
     </motion.div>
   )
