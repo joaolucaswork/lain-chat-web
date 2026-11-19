@@ -7,7 +7,7 @@ import { TenantExitButton } from '@/components/TenantExitButton'
 import { useChat } from '@/hooks/useChat'
 import { useSessions } from '@/hooks/useSessions'
 import type { ChatMessage, Session } from '@/types'
-import { ChatTeardrop, Brain, Gear, Plus, SidebarSimple } from '@phosphor-icons/react'
+import { ChatTeardrop, Brain, Gear, Plus, SidebarSimple, BookOpen } from '@phosphor-icons/react'
 import { IconRailButton, IconRailLink } from '@/components/layout/IconRail'
 import { ChatsPanel } from '@/components/layout/ChatsPanel'
 import { SessionRow } from '@/components/layout/SessionRow'
@@ -224,6 +224,14 @@ export function Layout() {
         </IconRailLink>
 
         <div className="flex-1" />
+
+        <IconRailLink
+          to="/docs/instalacao"
+          label="Guia de instalação"
+          active={location.pathname.startsWith('/docs')}
+        >
+          <BookOpen className="size-5" weight="regular" />
+        </IconRailLink>
 
         {isTenant ? (
           <>
