@@ -74,7 +74,9 @@ const AGENT_SNIPPETS: Record<(typeof AGENT_TABS)[number], string> = {
 export function DocsInstallPage() {
   const [tab, setTab] = useState<(typeof AGENT_TABS)[number]>('OpenCode')
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 pt-6 pb-16">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex-1 overflow-y-auto">
+        <div className="mx-auto w-full max-w-2xl px-4 pt-6 pb-16">
       <p className="text-xs text-muted-foreground">Documentação</p>
       <h1 className="mt-1 text-xl font-bold tracking-tight">
         Leve sua memória pra qualquer agente
@@ -167,6 +169,8 @@ export function DocsInstallPage() {
           (0600, nunca vai para o config do agente).
         </p>
       </Section>
+        </div>
+      </div>
     </div>
   )
 }
