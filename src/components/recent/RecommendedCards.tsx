@@ -38,7 +38,7 @@ const CARDS: RecommendedCard[] = [
   {
     eyebrow: 'Recall com contexto',
     title: 'Respostas que lembram de você',
-    desc: 'Antes de responder, ela busca memórias e conexões no grafo — sem você repetir tudo.',
+    desc: 'Antes de responder, ela busca memórias e conexões no grafo sem você repetir tudo.',
     prompt: 'Com base no que você sabe sobre mim, por onde devo começar hoje?',
     pill: 'Testar recall',
     count: '3 de 3',
