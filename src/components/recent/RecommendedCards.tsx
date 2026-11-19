@@ -29,7 +29,7 @@ const CARDS: RecommendedCard[] = [
   {
     eyebrow: 'Memória automática',
     title: 'Fale normal, ela guarda o essencial',
-    desc: 'A Lain extrai fatos sozinha do que você diz — sem comando, sem “lembre que”. É só conversar.',
+    desc: 'A Lain percebe o que importa no que você diz e guarda sozinha. É só conversar — ela lembra por você.',
     prompt: 'Trabalho com design, tomo café coado sem açúcar e tô tentando dormir mais cedo.',
     pill: 'Salvar exemplo',
     count: '2 de 3',
