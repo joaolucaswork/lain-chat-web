@@ -32,7 +32,7 @@ export function TenantExitButton({ compact }: { compact?: boolean }) {
   }
 
   if (!getTenantName() && meMode !== 'tenant') return null
-  const label = 'Sair (mantém seus dados)'
+  const label = 'Sair'
   const btn = (
     <button
       type="button"
@@ -40,7 +40,12 @@ export function TenantExitButton({ compact }: { compact?: boolean }) {
       disabled={busy !== null}
       title={label}
       aria-label={label}
-      className="flex w-full items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-medium text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground disabled:opacity-40"
+      className={
+        compact
+          // No rail: mesma caixa dos IconRailButton/Link (size-10, rounded-lg).
+          ? 'flex size-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground disabled:opacity-40'
+          : 'flex w-full items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-medium text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground disabled:opacity-40'
+      }
     >
       <SignOut className={compact ? 'size-5 shrink-0' : 'size-4 shrink-0'} weight="bold" />
       {!compact && <span className="truncate">{busy === 'logout' ? 'Saindo…' : 'Sair'}</span>}
