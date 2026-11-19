@@ -2,6 +2,26 @@ import { useState, useCallback } from 'react'
 import type { Memory, GraphNode, FeedbackAction, MemoryKind } from '@/types'
 import { sendFeedback, forgetMemory, restoreMemory } from '@/lib/memoryApi'
 
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+
+/** Fetch com 1 retry após 2s para erro transitório (deploy/blue-green flip).
+ *  Só 502/503/504 ou falha de rede merecem retry — 401/404 falham na hora. */
+async function fetchVault(path: string, retries = 1): Promise<Response> {
+  let res: Response
+  try {
+    res = await fetch(path)
+  } catch {
+    if (retries <= 0) throw new Error('vault not found')
+    await sleep(2000)
+    return fetchVault(path, retries - 1)
+  }
+  if (!res.ok && (res.status === 502 || res.status === 503 || res.status === 504) && retries > 0) {
+    await sleep(2000)
+    return fetchVault(path, retries - 1)
+  }
+  return res
+}
+
 export function useMemories() {
   const [memories, setMemories] = useState<Memory[]>([])
   const [graphNodes, setGraphNodes] = useState<GraphNode[]>([])
@@ -13,8 +33,8 @@ export function useMemories() {
     setError(null)
     try {
       const [mRes, gRes] = await Promise.all([
-        fetch('/api/vault/memories'),
-        fetch('/api/vault/graph'),
+        fetchVault('/api/vault/memories'),
+        fetchVault('/api/vault/graph'),
       ])
       if (!mRes.ok || !gRes.ok) throw new Error('vault not found')
       const m = await mRes.json()
