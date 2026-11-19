@@ -1,11 +1,24 @@
 import { Skeleton } from '@/components/ui/skeleton'
 
-type RouteFallbackVariant = 'memories' | 'settings'
+type RouteFallbackVariant = 'memories' | 'settings' | 'blank'
 
 // WHY: skeleton no lugar de spinner no lazy load de rotas — mantém
 // a estrutura aproximada da página e evita tela vazia / salto de layout.
+// 'blank' é neutro (sem cara de outra página): usado no boot do DemoGate
+// quando ainda não sabemos o modo e na rota / — evita o flash da página
+// de memórias dentro da home.
 export function RouteFallback({ variant = 'memories' }: { variant?: RouteFallbackVariant }) {
-  return variant === 'settings' ? <SettingsFallback /> : <MemoriesFallback />
+  if (variant === 'settings') return <SettingsFallback />
+  if (variant === 'blank') return <BlankFallback />
+  return <MemoriesFallback />
+}
+
+function BlankFallback() {
+  return (
+    <div role="status" aria-label="Carregando" className="flex min-h-0 flex-1 bg-background">
+      <span className="sr-only">carregando...</span>
+    </div>
+  )
 }
 
 function MemoriesFallback() {

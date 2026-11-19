@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useState } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { RouteFallback } from '@/components/RouteFallback'
 import { AuthGate } from '@/components/AuthGate'
@@ -22,6 +22,7 @@ const TenantSettingsPage = lazy(() =>
 
 function DemoGate({ children }: { children: React.ReactNode }) {
   const mode = useMe()
+  const location = useLocation()
   const [, setTick] = useState(0)
   // Cookie sumiu (limpeza manual/expiração) mas o nome ficou: sem key não há
   // conta — e sem limpar, o browser sem cookie cairia no escopo owner no BFF.
@@ -32,7 +33,14 @@ function DemoGate({ children }: { children: React.ReactNode }) {
       setTick((t) => t + 1)
     }
   }, [mode])
-  if (mode === 'unknown') return <RouteFallback variant="memories" />
+  if (mode === 'unknown') {
+    // WHY: o fallback precisa combinar com a rota atual. Mostrar o
+    // skeleton de memórias na home (/) causava um flash da página
+    // de memórias durante o /api/me inicial — na home, blank neutro.
+    if (location.pathname.startsWith('/memorias')) return <RouteFallback variant="memories" />
+    if (location.pathname.startsWith('/settings')) return <RouteFallback variant="settings" />
+    return <RouteFallback variant="blank" />
+  }
   // owner (modo legado) nunca vê o gate; demo sem cookie vê; tenant entra direto.
   if (mode === 'demo' && !getTenantName()) {
     // Pós-login: reload integral em vez de tick — o cookie novo só vale

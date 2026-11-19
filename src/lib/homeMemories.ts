@@ -2,6 +2,7 @@ import type { Memory } from '@/types'
 
 export const HIDDEN_HOME_KEY = 'lain-hidden-home-memories'
 export const COLLAPSED_HOME_KEY = 'lain-memories-home-collapsed'
+export const HAS_MEMORIES_HOME_KEY = 'lain-memories-home-has'
 export const SEARCH_PAGE_SIZE = 12
 export const SEARCH_DEBOUNCE_MS = 250
 
@@ -58,5 +59,28 @@ export function readCollapsedHome(): boolean {
 export function writeCollapsedHome(collapsed: boolean): void {
   try {
     localStorage.setItem(COLLAPSED_HOME_KEY, collapsed ? '1' : '0')
+  } catch { /* best-effort */ }
+}
+
+/**
+ * WHY: evita o flash do skeleton do swiper para quem não tem memórias.
+ * Guarda o resultado do último fetch: '1' tem, '0' vazio, null nunca
+ * consultado. Visitantes com '0' pulam o skeleton e renderizam null
+ * direto até o fetch provar o contrário.
+ */
+export function readHomeHasMemories(): boolean | null {
+  try {
+    const raw = localStorage.getItem(HAS_MEMORIES_HOME_KEY)
+    if (raw === '1') return true
+    if (raw === '0') return false
+    return null
+  } catch {
+    return null
+  }
+}
+
+export function persistHomeHasMemories(has: boolean): void {
+  try {
+    localStorage.setItem(HAS_MEMORIES_HOME_KEY, has ? '1' : '0')
   } catch { /* best-effort */ }
 }

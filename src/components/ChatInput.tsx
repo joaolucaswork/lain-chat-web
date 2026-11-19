@@ -32,6 +32,19 @@ export function ChatInput({ onSend, onStop, disabled, placeholder = 'Envie uma m
     return () => window.removeEventListener('lain:focus-composer', onFocus)
   }, [])
 
+  // WHY: cards de onboarding (estado vazio) preenchem o composer sem
+  // enviar — o usuário revisa e aperta Enter. CustomEvent carrega o prompt.
+  useEffect(() => {
+    const onPrefill = (e: Event) => {
+      const prompt = (e as CustomEvent<string>).detail
+      if (typeof prompt !== 'string' || !prompt) return
+      setText(prompt)
+      textareaRef.current?.focus()
+    }
+    window.addEventListener('lain:prefill-composer', onPrefill)
+    return () => window.removeEventListener('lain:prefill-composer', onPrefill)
+  }, [])
+
   const handleSend = () => {
     if (!text.trim() || disabled) return
     onSend(text.trim())

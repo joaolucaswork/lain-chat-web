@@ -3,7 +3,7 @@ import type { Memory, FeedbackAction } from '@/types'
 import { sendFeedback, forgetMemory, restoreMemory } from '@/lib/memoryApi'
 import {
   sortByCreatedDesc, filterByQuery,
-  loadHiddenHomeIds, persistHiddenHomeIds,
+  loadHiddenHomeIds, persistHiddenHomeIds, persistHomeHasMemories,
   SEARCH_PAGE_SIZE, SEARCH_DEBOUNCE_MS,
 } from '@/lib/homeMemories'
 
@@ -37,6 +37,7 @@ export function useRecentMemories() {
       const sorted = sortByCreatedDesc(Array.isArray(data) ? data : [])
       setMemories(sorted.filter((m) => !hidden.has(m.id)).slice(0, 12))
       setAllMemories(sorted)
+      persistHomeHasMemories(sorted.filter((m) => !hidden.has(m.id)).length > 0)
     } catch {
       /* mantém lista atual */
     } finally {

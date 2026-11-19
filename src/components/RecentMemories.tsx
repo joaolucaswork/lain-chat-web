@@ -8,9 +8,10 @@ import 'swiper/css'
 import { MemoryDetail } from '@/components/MemoryDetail'
 import { UndoBar } from '@/components/UndoBar'
 import { useRecentMemories } from '@/hooks/useRecentMemories'
-import { readCollapsedHome, writeCollapsedHome } from '@/lib/homeMemories'
+import { readCollapsedHome, writeCollapsedHome, readHomeHasMemories } from '@/lib/homeMemories'
 import { RecentMemoriesHeader } from '@/components/recent/RecentMemoriesHeader'
 import { InitialSkeleton, SearchSkeleton } from '@/components/recent/RecentMemoriesSkeleton'
+import { RecommendedCards, RecommendedCardsSkeleton } from '@/components/recent/RecommendedCards'
 import { MemoryCarouselCard } from '@/components/recent/MemoryCarouselCard'
 
 export function RecentMemories() {
@@ -142,12 +143,15 @@ export function RecentMemories() {
     return () => window.removeEventListener('keydown', onKey)
   }, [actions.selectedId, slidePage])
 
-  if (!loading && memories.length === 0) return null
+  // Vazio: onboarding explicativo no lugar do swiper. Loading mostra o
+  // skeleton na hora (sem grace): dos 3 cards por padrão, do swiper só
+  // quando o cache confirma que há memórias. Cards entram com stagger depois.
+  if (!loading && memories.length === 0) return <RecommendedCards />
 
   return (
     <AnimatePresence mode="wait" initial={false}>
       {loading ? (
-        <InitialSkeleton />
+        readHomeHasMemories() === true ? <InitialSkeleton /> : <RecommendedCardsSkeleton />
       ) : (
         <motion.div
           key="content"
