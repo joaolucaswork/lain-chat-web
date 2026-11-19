@@ -48,27 +48,19 @@ const CARDS: RecommendedCard[] = [
 
 function Visual({ kind }: { kind: RecommendedCard['visual'] }) {
   if (kind === 'capture') {
-    // Chat normal virando memória salva (bolha = token do chat).
+    // Mini-conversa: fala do usuário (bolha = token do chat) + resposta da Lain.
     return (
-      <div className="relative h-[110px] overflow-hidden rounded-lg bg-muted dark:bg-muted/60">
-        <div className="absolute -top-6 -right-6 size-28 rounded-full bg-primary/10" />
-        <div className="absolute top-3 left-3 w-[68%] rounded-md bg-primary p-2 text-primary-foreground shadow-sm">
-          <div className="mb-1.5 flex items-center gap-1.5">
-            <span className="flex size-4 items-center justify-center rounded-full bg-primary-foreground/20">
-              <Brain className="size-3" weight="bold" />
-            </span>
-            <div className="truncate text-[0px]">café coado…</div>
-          </div>
-          <div className="space-y-1">
-            <div className="h-1.5 w-full rounded-full bg-primary-foreground/30" />
-            <div className="h-1.5 w-4/5 rounded-full bg-primary-foreground/30" />
-          </div>
+      <div className="flex h-[110px] flex-col justify-center gap-1.5 overflow-hidden rounded-lg bg-muted p-3 dark:bg-muted/60">
+        <div className="max-w-[85%] self-end truncate rounded-2xl rounded-br-md bg-primary px-2.5 py-1.5 text-[10px] font-medium text-primary-foreground shadow-sm">
+          tomo café coado sem açúcar
         </div>
-        <div className="absolute right-3 bottom-3 flex items-center gap-1.5 rounded-full bg-card py-1 pr-2.5 pl-1 shadow-sm">
-          <span className="flex size-4 items-center justify-center rounded-full bg-emerald-500">
-            <Check className="size-3 text-white" weight="bold" />
+        <div className="flex max-w-[85%] items-center gap-1.5 self-start rounded-2xl rounded-bl-md bg-card px-2.5 py-1.5 shadow-sm">
+          <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-primary/10">
+            <Brain className="size-3 text-primary" weight="bold" />
           </span>
-          <span className="text-[10px] font-semibold text-card-foreground">salvo na memória</span>
+          <span className="truncate text-[10px] font-semibold text-card-foreground">
+            Anotado, vou lembrar
+          </span>
         </div>
       </div>
     )
