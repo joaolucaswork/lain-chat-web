@@ -1,6 +1,6 @@
 import { motion } from 'motion/react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Brain, Sparkle, ArrowUpRight, Check, Plug } from '@phosphor-icons/react'
+import { Plus, Brain, Sparkle, ArrowUpRight, Plug } from '@phosphor-icons/react'
 import { Skeleton } from '@/components/ui/skeleton'
 
 interface RecommendedCard {
