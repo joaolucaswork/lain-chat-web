@@ -54,6 +54,12 @@ function DemoGate({ children }: { children: React.ReactNode }) {
   return <MeContext.Provider value={mode}>{children}</MeContext.Provider>
 }
 
+/** WHY landing no apex: no host raiz (lainmemo.dev) a rota / é a landing
+    pública (home do OAuth); no subdomínio do app (chat.*) a / é o chat.
+    O bundle é o mesmo nos dois hosts — só o hostname decide. */
+const IS_APEX_HOST =
+  typeof window !== 'undefined' && /^(www\.)?lainmemo\.dev$/i.test(window.location.hostname)
+
 export default function App() {
   return (
     <TooltipProvider>
@@ -65,6 +71,7 @@ export default function App() {
           <Route path="/bem-vindo" element={<LandingPage />} />
           <Route path="/privacidade" element={<PrivacyPage />} />
           <Route path="/termos" element={<TermsPage />} />
+          {IS_APEX_HOST && <Route path="/" element={<LandingPage />} />}
           <Route
             path="/*"
             element={
