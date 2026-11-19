@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTheme, type ThemeMode } from "@/hooks/useTheme";
+import { BubbleThemePicker } from "@/components/settings/BubbleThemePicker";
 import { getTenantName, setTenantName, clearTenantName } from "@/hooks/useMe";
 import { supabase } from "@/lib/supabase";
 import {
@@ -263,6 +264,17 @@ export function TenantSettingsPage() {
                             <SelectItem value="dark">Escuro</SelectItem>
                           </SelectContent>
                         </Select>
+                      </div>
+                      <div className={row}>
+                        <div>
+                          <p className={label}>Cor das mensagens</p>
+                          <p className={hint}>
+                            Padrão ou a cor principal do tema.
+                          </p>
+                        </div>
+                        <div className="flex w-64 shrink-0 justify-end">
+                          <BubbleThemePicker />
+                        </div>
                       </div>
                     </div>
                   </section>

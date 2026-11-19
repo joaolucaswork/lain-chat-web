@@ -5,8 +5,8 @@ import { setTenantName } from '@/hooks/useMe'
 
 /**
  * Gate de entrada com Supabase Auth em 2 etapas (visual estilo Asana):
- * 1) centralizado: título + email + botão preto + perks;
- * 2) nome (signup) + senha, inputs Google-like com floating label.
+ * 1) email único — o BFF diz se a conta existe (login) ou não (cadastro);
+ * 2) senha (login) ou nome + senha (cadastro), inputs Google-like.
  * Troca a sessão por cookie HttpOnly via /api/auth/exchange.
  */
 
@@ -22,6 +22,7 @@ function FloatInput({
   autoComplete,
   autoFocus,
   maxLength,
+  inputMode,
   passwordToggle,
 }: {
   value: string
@@ -31,6 +32,7 @@ function FloatInput({
   autoComplete?: string
   autoFocus?: boolean
   maxLength?: number
+  inputMode?: 'numeric' | 'text'
   passwordToggle?: { show: boolean; onToggle: () => void }
 }) {
   return (
@@ -43,6 +45,7 @@ function FloatInput({
         autoComplete={autoComplete}
         autoFocus={autoFocus}
         maxLength={maxLength}
+        inputMode={inputMode}
         className={`peer w-full rounded border border-neutral-300 bg-white px-4 pb-2 pt-6 text-[15px] text-neutral-900 outline-none focus:border-neutral-900 ${passwordToggle ? 'pr-11' : ''}`}
       />
       <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[15px] text-neutral-500 transition-all peer-focus:top-1.5 peer-focus:translate-y-0 peer-focus:text-xs peer-focus:text-neutral-700 peer-[:not(:placeholder-shown)]:top-1.5 peer-[:not(:placeholder-shown)]:translate-y-0 peer-[:not(:placeholder-shown)]:text-xs">
@@ -62,10 +65,39 @@ function FloatInput({
   )
 }
 
+/** Logo "G" do Google (cores oficiais) para o botão de OAuth. */
+function GoogleLogo({ className = 'size-5' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden className={className}>
+      <path
+        fill="#4285F4"
+        d="M23.5 12.27c0-.85-.08-1.66-.22-2.45H12v4.64h6.45a5.52 5.52 0 0 1-2.39 3.62v3h3.87c2.26-2.09 3.57-5.16 3.57-8.81z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 24c3.24 0 5.96-1.07 7.94-2.91l-3.87-3c-1.08.72-2.45 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.96H1.29v3.1A12 12 0 0 0 12 24z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.27 14.28A7.2 7.2 0 0 1 4.89 12c0-.79.14-1.56.38-2.28v-3.1H1.29a12 12 0 0 0 0 10.76l3.98-3.1z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 4.76c1.76 0 3.3.6 4.53 1.79l3.4-3.4A11.98 11.98 0 0 0 12 0 12 12 0 0 0 1.29 6.62l3.98 3.1C6.22 6.87 8.87 4.76 12 4.76z"
+      />
+    </svg>
+  )
+}
+
 export function AuthGate({ onDone }: { onDone: () => void }) {
-  const [mode, setMode] = useState<'login' | 'signup'>('signup')
   const [step, setStep] = useState<1 | 2>(1)
   const [email, setEmail] = useState('')
+  /** null = ainda não checado; true = conta existe (login), false = cadastro. */
+  const [exists, setExists] = useState<boolean | null>(null)
+  const [method, setMethod] = useState<'password' | 'code'>('password')
+  const [otpSent, setOtpSent] = useState(false)
+  const [otp, setOtp] = useState('')
+  const [resendIn, setResendIn] = useState(0)
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [name, setName] = useState('')
@@ -115,14 +147,107 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim())
   }
 
-  function goStep2(e: React.FormEvent) {
+  // Etapa 1: email único — descobre se a conta existe antes de pedir a senha.
+  async function goStep2(e: React.FormEvent) {
     e.preventDefault()
-    if (!validEmail(email)) {
+    const clean = email.trim()
+    if (!validEmail(clean)) {
       setError('Informe um email válido.')
       return
     }
     setError('')
-    setStep(2)
+    setBusy(true)
+    try {
+      const res = await fetch('/api/auth/check-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: clean }),
+      })
+      const data = (await res.json().catch(() => null)) as { exists?: boolean } | null
+      if (!res.ok || typeof data?.exists !== 'boolean') {
+        setError('Sem conexão com o servidor. Tente de novo.')
+        return
+      }
+      setEmail(clean)
+      setExists(data.exists)
+      setStep(2)
+    } catch {
+      setError('Sem conexão com o servidor. Tente de novo.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // Cooldown do reenvio (SMTP padrão tem limite rígido).
+  useEffect(() => {
+    if (resendIn <= 0) return
+    const t = window.setTimeout(() => setResendIn((v) => v - 1), 1000)
+    return () => window.clearTimeout(t)
+  }, [resendIn])
+
+  async function sendCode() {
+    const client = supabase()
+    if (!client || busy) return
+    const cleanEmail = email.trim()
+    if (exists === false && !name.trim()) {
+      setError('Informe seu nome.')
+      return
+    }
+    setBusy(true)
+    setError('')
+    setInfo('')
+    try {
+      // exists=true → só entra; conta nova → cria (nome vai no exchange).
+      const { error } = await client.auth.signInWithOtp({
+        email: cleanEmail,
+        options: { shouldCreateUser: exists !== true },
+      })
+      if (error) {
+        setError(error.message)
+        return
+      }
+      setOtpSent(true)
+      setResendIn(30)
+      setInfo(`Código de 6 dígitos enviado para ${cleanEmail}. Vale por 1 hora.`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function verifyCode(e: React.FormEvent) {
+    e.preventDefault()
+    const client = supabase()
+    if (!client || busy) return
+    const clean = otp.trim()
+    if (clean.length < 6) {
+      setError('Digite o código de 6 dígitos.')
+      return
+    }
+    setBusy(true)
+    setError('')
+    setInfo('')
+    try {
+      const { data, error } = await client.auth.verifyOtp({
+        email: email.trim(),
+        token: clean,
+        type: 'email',
+      })
+      if (error) {
+        setError(error.message)
+        return
+      }
+      if (!data.session) {
+        setError('Sessão não criada — tente de novo.')
+        return
+      }
+      await exchange(
+        data.session.access_token,
+        email.trim(),
+        exists === false ? name.trim() || email.trim() : undefined,
+      )
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function submitStep2(e: React.FormEvent) {
@@ -130,7 +255,8 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
     const client = supabase()
     if (!client || busy) return
     const cleanEmail = email.trim()
-    if (mode === 'signup') {
+    const isSignup = exists === false
+    if (isSignup) {
       if (!name.trim()) {
         setError('Informe seu nome.')
         return
@@ -147,7 +273,7 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
     setError('')
     setInfo('')
     try {
-      if (mode === 'signup') {
+      if (isSignup) {
         const { data, error } = await client.auth.signUp({
           password,
           email: cleanEmail,
@@ -158,10 +284,11 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
           return
         }
         if (!data.session) {
-          // Confirmação de email ligada no dashboard: entra após clicar no link.
+          // Confirmação de email ligada no dashboard: a conta passa a
+          // existir — entra após clicar no link.
           setError('')
-          setInfo('Conta criada! Confirme o email e depois faça login.')
-          setMode('login')
+          setInfo('Conta criada! Confirme o email e depois entre com sua senha.')
+          setExists(true)
           return
         }
         await exchange(data.session.access_token, cleanEmail, name.trim() || cleanEmail)
@@ -199,16 +326,6 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
     }
   }
 
-  function switchMode(next: 'login' | 'signup') {
-    setMode(next)
-    setStep(1)
-    setError('')
-    setInfo('')
-    setPassword('')
-    setShowPassword(false)
-    if (next === 'login') setName('')
-  }
-
   if (!isSupabaseConfigured()) {
     return (
       <div className="flex h-dvh items-center justify-center bg-white p-6">
@@ -219,10 +336,11 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
     )
   }
 
+  // WHY: botão principal segue o tema (verde --primary), não preto fixo.
   const blackBtn =
-    'w-full rounded bg-neutral-900 px-4 py-3 font-medium text-white disabled:opacity-40'
+    'w-full rounded bg-primary px-4 py-3 font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40'
   const ghostBtn =
-    'w-full rounded border border-neutral-300 bg-white px-4 py-3 font-medium text-neutral-900 disabled:opacity-40'
+    'flex w-full items-center justify-center gap-2 rounded border border-neutral-300 bg-white px-4 py-3 font-medium text-neutral-900 disabled:opacity-40'
 
   // ── Etapa 1: só email (centralizado) ──
   if (step === 1) {
@@ -230,100 +348,158 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
       <div className="flex h-dvh flex-col bg-white text-neutral-900">
         <div className="px-8 pt-6 text-xl font-bold">Lain</div>
         <div className="flex flex-1 items-center justify-center p-6">
-          <form onSubmit={goStep2} className="w-full max-w-md space-y-4 text-center">
-            <h1 className="text-3xl font-normal">{mode === 'signup' ? 'Criar conta' : 'Entrar'}</h1>
-            <p className="text-xs text-neutral-500">
-              {mode === 'signup'
-                ? 'Ao criar a conta, você concorda com os Termos e a Privacidade.'
-                : 'Bem-vindo de volta — sua memória continua onde você parou.'}
-            </p>
-            <div className="text-left">
-              <FloatInput
-                value={email}
-                onChange={setEmail}
-                label="E-mail"
-                type="email"
-                autoComplete="email"
-                autoFocus
-              />
+          <form onSubmit={goStep2} className="w-full max-w-2xl space-y-4 text-center">
+            <div className="mx-auto w-full max-w-md space-y-4">
+              <h1 className="text-3xl font-normal">Entre ou crie uma conta</h1>
+              <p className="text-xs text-neutral-500">
+                Memória de longo prazo universal.
+              </p>
+              <button type="button" onClick={() => void google()} disabled={busy} className={ghostBtn}>
+                <GoogleLogo />
+                Continuar com Google
+              </button>
+              <div className="text-left">
+                <FloatInput
+                  value={email}
+                  onChange={setEmail}
+                  label="E-mail"
+                  type="email"
+                  autoComplete="email"
+                  autoFocus
+                />
+              </div>
+              {error && <p className="text-sm text-rose-600">{error}</p>}
+              <button type="submit" disabled={busy} className={blackBtn}>
+                {busy ? 'Aguarde…' : 'Continuar'}
+              </button>
             </div>
-            {error && <p className="text-sm text-rose-600">{error}</p>}
-            <button type="submit" disabled={busy} className={blackBtn}>
-              Continuar
-            </button>
-            <button type="button" onClick={() => void google()} disabled={busy} className={ghostBtn}>
-              Continuar com Google
-            </button>
-            <p className="text-sm text-neutral-600">
-              {mode === 'signup' ? (
-                <>
-                  Já tem conta?{' '}
-                  <button type="button" onClick={() => switchMode('login')} className="underline">
-                    Entre
-                  </button>
-                </>
-              ) : (
-                <>
-                  Sem conta?{' '}
-                  <button type="button" onClick={() => switchMode('signup')} className="underline">
-                    Crie uma
-                  </button>
-                </>
-              )}
-            </p>
-            {mode === 'signup' && (
-              <div className="grid grid-cols-3 gap-4 pt-10 text-left">
+            <div className="grid grid-cols-1 gap-4 pt-10 text-left sm:grid-cols-3 sm:gap-6">
                 {[
-                  'Memória isolada só sua, em todos os devices.',
-                  'Lembretes e contexto que atravessam sessões.',
-                  'Você pode apagar tudo quando quiser.',
+                  'Sua memória em qualquer agente — chat, cofre e MCP.',
+                  'Ela guarda o essencial sozinha, é só conversar.',
+                  'Respostas com seu contexto, sem repetir nada.',
                 ].map((perk) => (
                   <div key={perk} className="flex gap-2">
                     <CheckCircle className="mt-0.5 size-5 shrink-0 text-neutral-700" />
-                    <p className="text-xs leading-relaxed text-neutral-600">{perk}</p>
+                    <p className="text-xs leading-relaxed text-neutral-600 sm:text-[13px]">{perk}</p>
                   </div>
                 ))}
               </div>
-            )}
           </form>
         </div>
       </div>
     )
   }
 
-  // ── Etapa 2: nome + senha (alinhado à esquerda) ──
+  // ── Etapa 2: senha ou código por e-mail (OTP de 6 dígitos, expira em 1h) ──
+  const isSignup = exists === false
   const step2Valid =
-    mode === 'login' ? password.length >= 6 : name.trim().length > 0 && password.length >= 6
+    isSignup ? name.trim().length > 0 && password.length >= 6 : password.length >= 6
   return (
     <div className="flex h-dvh flex-col bg-white text-neutral-900">
       <div className="px-8 pt-6 text-xl font-bold">Lain</div>
       <div className="flex flex-1 items-start justify-start p-6 sm:items-center">
-        <form onSubmit={(e) => void submitStep2(e)} className="w-full max-w-md space-y-5 px-4 text-left sm:px-12">
-          <h1 className="text-2xl font-bold">{mode === 'signup' ? 'Bem-vindo!' : 'Bem-vindo de volta!'}</h1>
+        <form
+          onSubmit={(e) => void (method === 'password' ? submitStep2(e) : verifyCode(e))}
+          className="w-full max-w-md space-y-5 px-4 text-left sm:px-12"
+        >
+          <h1 className="text-2xl font-bold">{isSignup ? 'Crie sua conta' : 'Bem-vindo de volta!'}</h1>
           <p className="text-sm text-neutral-600">
-            {mode === 'signup' ? 'Criando a conta como' : 'Entrando como'} {email.trim()}.
+            {isSignup ? 'Criando a conta como' : 'Entrando como'} {email.trim()}.
           </p>
-          {mode === 'signup' && (
-            <FloatInput value={name} onChange={setName} label="Nome" autoComplete="nickname" autoFocus maxLength={40} />
-          )}
-          <div>
-            <FloatInput
-              value={password}
-              onChange={setPassword}
-              label={mode === 'signup' ? 'Criar senha' : 'Senha'}
-              autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-              autoFocus={mode === 'login'}
-              passwordToggle={{ show: showPassword, onToggle: () => setShowPassword((v) => !v) }}
-            />
-            {mode === 'signup' && (
-              <p className="pt-1 text-xs text-neutral-500">Crie uma senha com pelo menos 6 caracteres.</p>
-            )}
+          <div className="flex gap-1 rounded-full bg-neutral-100 p-1" role="tablist" aria-label="Método de acesso">
+            {(['password', 'code'] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                role="tab"
+                aria-selected={method === m}
+                onClick={() => {
+                  setMethod(m)
+                  setError('')
+                }}
+                className={
+                  method === m
+                    ? 'flex-1 rounded-full bg-white px-3 py-1.5 text-[13px] font-medium text-neutral-900 shadow-sm'
+                    : 'flex-1 rounded-full px-3 py-1.5 text-[13px] text-neutral-500'
+                }
+              >
+                {m === 'password' ? 'Senha' : 'Código por e-mail'}
+              </button>
+            ))}
           </div>
-          {error && <p className="text-sm text-rose-600">{error}</p>}
-          {info && <p className="text-sm text-neutral-600">{info}</p>}
-          <button type="submit" disabled={busy || !step2Valid} className={blackBtn}>
-            {busy ? 'Aguarde…' : 'Continuar'}
-          </button>
+          {method === 'password' ? (
+            <>
+              {isSignup && (
+                <FloatInput value={name} onChange={setName} label="Nome" autoComplete="nickname" autoFocus maxLength={40} />
+              )}
+              <div>
+                <FloatInput
+                  value={password}
+                  onChange={setPassword}
+                  label={isSignup ? 'Criar senha' : 'Senha'}
+                  autoComplete={isSignup ? 'new-password' : 'current-password'}
+                  autoFocus={!isSignup}
+                  passwordToggle={{ show: showPassword, onToggle: () => setShowPassword((v) => !v) }}
+                />
+                {isSignup && (
+                  <p className="pt-1 text-xs text-neutral-500">Crie uma senha com pelo menos 6 caracteres.</p>
+                )}
+              </div>
+              {error && <p className="text-sm text-rose-600">{error}</p>}
+              {info && <p className="text-sm text-neutral-600">{info}</p>}
+              <button type="submit" disabled={busy || !step2Valid} className={blackBtn}>
+                {busy ? 'Aguarde…' : isSignup ? 'Criar conta' : 'Entrar'}
+              </button>
+            </>
+          ) : (
+            <>
+              {isSignup && (
+                <FloatInput value={name} onChange={setName} label="Nome" autoComplete="nickname" autoFocus maxLength={40} />
+              )}
+              {!otpSent ? (
+                <>
+                  <p className="text-sm text-neutral-600">
+                    Vamos enviar um código de 6 dígitos para {email.trim()}.
+                    {isSignup ? ' Ele cria sua conta na hora.' : ''}
+                  </p>
+                  {error && <p className="text-sm text-rose-600">{error}</p>}
+                  {info && <p className="text-sm text-neutral-600">{info}</p>}
+                  <button type="button" onClick={() => void sendCode()} disabled={busy} className={blackBtn}>
+                    {busy ? 'Enviando…' : 'Enviar código'}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <FloatInput
+                    value={otp}
+                    onChange={(v) => setOtp(v.replace(/\D/g, '').slice(0, 6))}
+                    label="Código de 6 dígitos"
+                    autoComplete="one-time-code"
+                    autoFocus
+                    maxLength={6}
+                    inputMode="numeric"
+                  />
+                  {error && <p className="text-sm text-rose-600">{error}</p>}
+                  {info && <p className="text-sm text-neutral-600">{info}</p>}
+                  <button type="submit" disabled={busy || otp.trim().length < 6} className={blackBtn}>
+                    {busy ? 'Aguarde…' : isSignup ? 'Verificar e criar conta' : 'Verificar e entrar'}
+                  </button>
+                  <p className="text-sm text-neutral-600">
+                    Não recebeu?{' '}
+                    <button
+                      type="button"
+                      onClick={() => void sendCode()}
+                      disabled={busy || resendIn > 0}
+                      className="underline disabled:opacity-40"
+                    >
+                      Reenviar{resendIn > 0 ? ` (${resendIn}s)` : ''}
+                    </button>
+                  </p>
+                </>
+              )}
+            </>
+          )}
           <p className="text-sm text-neutral-600">
             Email errado?{' '}
             <button
@@ -331,21 +507,14 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
               onClick={() => {
                 setStep(1)
                 setError('')
+                setOtp('')
+                setOtpSent(false)
+                setResendIn(0)
               }}
               className="underline"
             >
               Voltar
-            </button>{' '}
-            ·{' '}
-            {mode === 'signup' ? (
-              <button type="button" onClick={() => switchMode('login')} className="underline">
-                Já tenho conta
-              </button>
-            ) : (
-              <button type="button" onClick={() => switchMode('signup')} className="underline">
-                Criar conta
-              </button>
-            )}
+            </button>
           </p>
         </form>
       </div>

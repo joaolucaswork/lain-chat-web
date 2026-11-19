@@ -27,6 +27,21 @@ function adminClient(): SupabaseClient {
   return _admin;
 }
 
+/** Localiza o id do usuário pelo email (login primeiro, cadastro depois). Paginado — suficiente para a base atual. */
+export async function findUserIdByEmail(email: string): Promise<string | null> {
+  const target = (email ?? '').trim().toLowerCase();
+  if (!target || target.length > 320) return null;
+  if (!isSupabaseConfigured()) throw new Error('auth not configured');
+  for (let page = 1; page <= 10; page++) {
+    const { data, error } = await adminClient().auth.admin.listUsers({ page, perPage: 100 });
+    if (error) throw new Error(error.message);
+    const found = data.users.find((u) => (u.email ?? '').toLowerCase() === target);
+    if (found) return found.id;
+    if (data.users.length < 100) break;
+  }
+  return null;
+}
+
 /** Valida o access_token e devolve o usuário (id + email). Throw = 401 no caller. */
 export async function getSupabaseUser(accessToken: string): Promise<Pick<User, 'id' | 'email'>> {
   const token = (accessToken ?? '').trim();

@@ -10,7 +10,21 @@
 import { MEMORY_KEY, MEMORY_URL } from '../config.ts';
 import { json } from '../lib/http.ts';
 import { cacheSlugForKey, tenantCookieSet } from '../lib/tenant.ts';
-import { getSupabaseUser, isSupabaseConfigured } from '../lib/supabase.ts';
+import { findUserIdByEmail, getSupabaseUser, isSupabaseConfigured } from '../lib/supabase.ts';
+
+// Anti-enumeração do check-email: 10/h por IP (revela se o email tem conta).
+const _checkBudget = new Map<string, { count: number; resetAt: number }>();
+function checkCheckAllowed(ip: string): boolean {
+  const now = Date.now();
+  const cur = _checkBudget.get(ip);
+  if (!cur || now > cur.resetAt) {
+    _checkBudget.set(ip, { count: 1, resetAt: now + 3600_000 });
+    return true;
+  }
+  if (cur.count >= 10) return false;
+  cur.count++;
+  return true;
+}
 
 // Anti-abuso do exchange: 20/h por IP (login legítimo raramente repete).
 const _exchangeBudget = new Map<string, { count: number; resetAt: number }>();
@@ -35,6 +49,27 @@ function clientIpOf(req: Request): string {
 }
 
 export async function handleAuth(req: Request, path: string): Promise<Response | null> {
+  if (req.method === 'POST' && path === '/api/auth/check-email') {
+    if (!isSupabaseConfigured()) return json({ error: 'auth not configured' }, 500);
+    const ip = clientIpOf(req);
+    if (!checkCheckAllowed(ip)) return json({ error: 'too many attempts — try again later' }, 429);
+    let body: Record<string, unknown>;
+    try {
+      body = await req.json();
+    } catch {
+      return json({ error: 'Invalid JSON' }, 400);
+    }
+    const email = typeof body.email === 'string' ? body.email.trim() : '';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: 'invalid email' }, 400);
+    try {
+      const id = await findUserIdByEmail(email);
+      return json({ exists: id !== null });
+    } catch (err) {
+      console.error('[bff] check-email failed:', err instanceof Error ? err.message : err);
+      return json({ error: 'could not check email — try again' }, 502);
+    }
+  }
+
   if (req.method !== 'POST' || path !== '/api/auth/exchange') return null;
   if (!isSupabaseConfigured()) return json({ error: 'auth not configured' }, 500);
   if (!MEMORY_KEY) return json({ error: 'memory backend not configured' }, 500);

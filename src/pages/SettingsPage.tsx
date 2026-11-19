@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useTheme } from '@/hooks/useTheme'
+import { BubbleThemePicker } from '@/components/settings/BubbleThemePicker'
 import { Moon, Sun } from '@phosphor-icons/react'
 import { useModel } from '@/hooks/useModel'
 
@@ -101,6 +102,18 @@ export function SettingsPage() {
                 {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
                 <span className="text-sm">{dark ? 'Escuro' : 'Claro'}</span>
               </button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Tema</CardTitle>
+              <CardDescription>
+                Define a cor das suas mensagens no chat.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <BubbleThemePicker />
             </CardContent>
           </Card>
 

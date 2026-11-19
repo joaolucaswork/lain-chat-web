@@ -5,6 +5,7 @@ import { RouteFallback } from '@/components/RouteFallback'
 import { AuthGate } from '@/components/AuthGate'
 import { Layout } from '@/pages/Layout'
 import { ChatPage } from '@/pages/ChatPage'
+import { LandingPage, PrivacyPage, TermsPage } from '@/pages/Public'
 import { MeContext, clearTenantName, getTenantName, useMe, useMeMode } from '@/hooks/useMe'
 
 // WHY: ChatPage fica no bundle inicial (rota / é o chat); Memórias/Settings
@@ -57,45 +58,58 @@ export default function App() {
   return (
     <TooltipProvider>
       <BrowserRouter>
-        <DemoGate>
-          <Routes>
-            <Route element={<Layout />}>
-              <Route path="/" element={<ChatPage />} />
-              <Route
-                path="/memorias"
-                element={
-                  <Suspense fallback={<RouteFallback variant="memories" />}>
-                    <MemoriesPage />
-                  </Suspense>
-                }
-              />
-              <Route
-                path="/settings"
-                element={
-                  <Suspense fallback={<RouteFallback variant="settings" />}>
-                    <TenantSettingsGuard />
-                  </Suspense>
-                }
-              />
-              <Route
-                path="/settings/conta"
-                element={
-                  <Suspense fallback={<RouteFallback variant="settings" />}>
-                    <TenantAccountGuard />
-                  </Suspense>
-                }
-              />
-              <Route
-                path="/docs/instalacao"
-                element={
-                  <Suspense fallback={<RouteFallback variant="blank" />}>
-                    <DocsInstallPage />
-                  </Suspense>
-                }
-              />
-            </Route>
-          </Routes>
-        </DemoGate>
+        <Routes>
+          {/* WHY públicas: fora do DemoGate/AuthGate — Google exige home,
+              privacidade e termos acessíveis sem login (a home do app é
+              murada). Import estático: páginas leves, sem lazy. */}
+          <Route path="/bem-vindo" element={<LandingPage />} />
+          <Route path="/privacidade" element={<PrivacyPage />} />
+          <Route path="/termos" element={<TermsPage />} />
+          <Route
+            path="/*"
+            element={
+              <DemoGate>
+                <Routes>
+                  <Route element={<Layout />}>
+                    <Route path="/" element={<ChatPage />} />
+                    <Route
+                      path="/memorias"
+                      element={
+                        <Suspense fallback={<RouteFallback variant="memories" />}>
+                          <MemoriesPage />
+                        </Suspense>
+                      }
+                    />
+                    <Route
+                      path="/settings"
+                      element={
+                        <Suspense fallback={<RouteFallback variant="settings" />}>
+                          <TenantSettingsGuard />
+                        </Suspense>
+                      }
+                    />
+                    <Route
+                      path="/settings/conta"
+                      element={
+                        <Suspense fallback={<RouteFallback variant="settings" />}>
+                          <TenantAccountGuard />
+                        </Suspense>
+                      }
+                    />
+                    <Route
+                      path="/docs/instalacao"
+                      element={
+                        <Suspense fallback={<RouteFallback variant="blank" />}>
+                          <DocsInstallPage />
+                        </Suspense>
+                      }
+                    />
+                  </Route>
+                </Routes>
+              </DemoGate>
+            }
+          />
+        </Routes>
       </BrowserRouter>
     </TooltipProvider>
   )

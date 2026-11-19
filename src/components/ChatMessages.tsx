@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Markdown } from '@/components/Markdown'
 import { ArrowDown, Check, Copy, ArrowCounterClockwise } from '@phosphor-icons/react'
+import { useBubbleTheme } from '@/hooks/useBubbleTheme'
 
 interface ChatMessagesProps {
   messages: ChatMessage[]
@@ -65,6 +66,9 @@ export function ChatMessages({ messages, processing, onRetry }: ChatMessagesProp
   const viewportRef = useRef<HTMLDivElement>(null)
   const stickRef = useRef(true)
   const [showJump, setShowJump] = useState(false)
+  // WHY tema: bolha do usuário alterna entre Padrão (cinza por modo) e
+  // Principal (verde) — Configurações > Tema. Só troca o token, sem cor custom.
+  const { bubble } = useBubbleTheme()
 
   // Último user sem resposta (ex: erro aconteceu e a página foi recarregada,
   // limpando o balão de erro que não é persistido) — oferece retry.
@@ -142,7 +146,11 @@ export function ChatMessages({ messages, processing, onRetry }: ChatMessagesProp
                       <Bubble
                         variant="secondary"
                         align="end"
-                        className="max-w-[88%] min-w-0 sm:max-w-[80%] *:data-[slot=bubble-content]:bg-[#E4E4E7] *:data-[slot=bubble-content]:text-zinc-900 dark:*:data-[slot=bubble-content]:bg-[#2E2F31] dark:*:data-[slot=bubble-content]:text-neutral-100"
+                        className={
+                          bubble === 'primary'
+                            ? 'max-w-[88%] min-w-0 transition-colors duration-300 ease-out sm:max-w-[80%] *:data-[slot=bubble-content]:bg-primary *:data-[slot=bubble-content]:text-primary-foreground *:data-[slot=bubble-content]:transition-colors *:data-[slot=bubble-content]:duration-300'
+                            : 'max-w-[88%] min-w-0 transition-colors duration-300 ease-out sm:max-w-[80%] *:data-[slot=bubble-content]:bg-[#E4E4E7] *:data-[slot=bubble-content]:text-zinc-900 *:data-[slot=bubble-content]:transition-colors *:data-[slot=bubble-content]:duration-300 dark:*:data-[slot=bubble-content]:bg-[#2E2F31] dark:*:data-[slot=bubble-content]:text-neutral-100'
+                        }
                       >
                         <BubbleContent className="min-w-0 max-w-full overflow-hidden whitespace-pre-wrap text-[15px] font-[360] leading-[1.7] tracking-[0.01em] break-words sm:text-[16px] sm:leading-[1.8] sm:tracking-[0.015em]">
                           {msg.content}
