@@ -30,7 +30,7 @@ const CARDS: RecommendedCard[] = [
     eyebrow: 'Memória automática',
     title: 'Fale normal, ela guarda o essencial',
     desc: 'A Lain percebe o que importa no que você diz e guarda sozinha. É só conversar — ela lembra por você.',
-    prompt: 'O deploy de sexta caiu por falta de memória no Redis e o endpoint /mcp exige Bearer.',
+    prompt: 'O deploy de sexta caiu com o Qdrant fora do ar e o endpoint /mcp exige Bearer.',
     pill: 'Salvar exemplo',
     count: '2 de 3',
     visual: 'capture',
@@ -52,7 +52,7 @@ function Visual({ kind }: { kind: RecommendedCard['visual'] }) {
     return (
       <div className="flex h-[110px] flex-col justify-center gap-1.5 overflow-hidden rounded-lg bg-muted p-3 dark:bg-muted/60">
         <div className="max-w-[85%] self-end truncate rounded-2xl rounded-br-md bg-primary px-2.5 py-1.5 text-[10px] font-medium text-primary-foreground shadow-sm">
-          deploy caiu — Redis sem memória
+          deploy caiu — Qdrant fora do ar
         </div>
         <div className="flex max-w-[85%] items-center gap-1.5 self-start rounded-2xl rounded-bl-md bg-card px-2.5 py-1.5 shadow-sm">
           <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-primary/10">
