@@ -85,7 +85,7 @@ const server = Bun.serve({
 // (idleTimeout 120s) demora a morrer — o próximo processo bate em
 // EADDRINUSE e o contador de restarts acumula (550+ em Nov/2026).
 let _shuttingDown = false;
-function shutdownGracefully(signal: string) {
+function shutdownGracefully() {
   if (_shuttingDown) return;
   _shuttingDown = true;
   try {
@@ -94,7 +94,7 @@ function shutdownGracefully(signal: string) {
     process.exit(0);
   }
 }
-process.on('SIGTERM', () => shutdownGracefully('SIGTERM'));
-process.on('SIGINT', () => shutdownGracefully('SIGINT'));
+process.on('SIGTERM', () => shutdownGracefully());
+process.on('SIGINT', () => shutdownGracefully());
 
 console.log(`[lain-chat-bff] listening on http://${BIND_ADDR}:${PORT} (memory: ${MEMORY_URL}, llm: ${LLM_BASE}, auth: ${isSupabaseConfigured() ? 'supabase' : 'legacy'})`);

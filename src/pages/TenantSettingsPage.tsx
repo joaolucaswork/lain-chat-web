@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
-import { useTheme, type ThemeMode } from "@/hooks/useTheme";
-import { BubbleThemePicker } from "@/components/settings/BubbleThemePicker";
-import { getTenantName, setTenantName, clearTenantName } from "@/hooks/useMe";
-import { supabase } from "@/lib/supabase";
+import { useEffect, useState } from 'react'
+import { useTheme, type ThemeMode } from '@/hooks/useTheme'
+import { BubbleThemePicker } from '@/components/settings/BubbleThemePicker'
+import { getTenantName, setTenantName, clearTenantName } from '@/hooks/useMe'
+import { supabase } from '@/lib/supabase'
 import {
   Dialog,
   DialogContent,
@@ -10,14 +10,14 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from '@/components/ui/dialog'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from '@/components/ui/select'
 
 /**
  * Conta do visitante (demo): perfil + aparência.
@@ -26,84 +26,84 @@ import {
  * barato para tenants e a trava real é no server (effectiveModel).
  */
 export function TenantSettingsPage() {
-  const { theme, setTheme } = useTheme();
-  const [name, setName] = useState(() => getTenantName() ?? "");
-  const [savedName, setSavedName] = useState<string | null>(null);
-  const [email, setEmail] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [info, setInfo] = useState("");
+  const { theme, setTheme } = useTheme()
+  const [name, setName] = useState(() => getTenantName() ?? '')
+  const [savedName, setSavedName] = useState<string | null>(null)
+  const [email, setEmail] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [info, setInfo] = useState('')
   // Modal de confirmação do wipe: via única para login com senha e com Google —
   // digitar APAGAR libera o botão. Um caminho só, sem bifurcar por provedor.
-  const WIPE_WORD = "APAGAR";
-  const [wipeOpen, setWipeOpen] = useState(false);
-  const [wipeConfirm, setWipeConfirm] = useState("");
-  const [wipeBusy, setWipeBusy] = useState(false);
-  const [wipeError, setWipeError] = useState("");
-  const wipeReady = wipeConfirm.trim() === WIPE_WORD;
+  const WIPE_WORD = 'APAGAR'
+  const [wipeOpen, setWipeOpen] = useState(false)
+  const [wipeConfirm, setWipeConfirm] = useState('')
+  const [wipeBusy, setWipeBusy] = useState(false)
+  const [wipeError, setWipeError] = useState('')
+  const wipeReady = wipeConfirm.trim() === WIPE_WORD
 
   useEffect(() => {
-    let alive = true;
-    fetch("/api/tenant/profile")
+    let alive = true
+    fetch('/api/tenant/profile')
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (!alive || typeof d?.name !== "string") return;
-        setName(d.name);
-        setTenantName(d.name);
+        if (!alive || typeof d?.name !== 'string') return
+        setName(d.name)
+        setTenantName(d.name)
       })
-      .catch(() => {});
+      .catch(() => {})
     supabase()
       ?.auth.getSession()
       .then(({ data }) => {
-        if (!alive) return;
-        const mail = data.session?.user.email;
-        if (mail) setEmail(mail);
+        if (!alive) return
+        const mail = data.session?.user.email
+        if (mail) setEmail(mail)
       })
-      .catch(() => {});
+      .catch(() => {})
     return () => {
-      alive = false;
-    };
-  }, []);
+      alive = false
+    }
+  }, [])
 
   async function save(e: React.FormEvent) {
-    e.preventDefault();
-    if (busy) return;
-    const clean = name.trim();
+    e.preventDefault()
+    if (busy) return
+    const clean = name.trim()
     if (clean.length < 2) {
-      setError("Informe um nome (mín. 2 letras).");
-      return;
+      setError('Informe um nome (mín. 2 letras).')
+      return
     }
-    setBusy(true);
-    setError("");
-    setInfo("");
+    setBusy(true)
+    setError('')
+    setInfo('')
     try {
-      const res = await fetch("/api/tenant/profile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await fetch('/api/tenant/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: clean.slice(0, 40) }),
-      });
+      })
       const data = (await res.json().catch(() => null)) as {
-        name?: string;
-        error?: string;
-      } | null;
-      if (!res.ok || typeof data?.name !== "string") {
-        setError(data?.error ?? "Não foi possível salvar. Tente de novo.");
-        return;
+        name?: string
+        error?: string
+      } | null
+      if (!res.ok || typeof data?.name !== 'string') {
+        setError(data?.error ?? 'Não foi possível salvar. Tente de novo.')
+        return
       }
-      setTenantName(data.name);
-      setSavedName(data.name);
-      setInfo(`Pronto — vou te chamar de ${data.name}.`);
+      setTenantName(data.name)
+      setSavedName(data.name)
+      setInfo(`Pronto — vou te chamar de ${data.name}.`)
     } catch {
-      setError("Sem conexão com o servidor. Tente de novo.");
+      setError('Sem conexão com o servidor. Tente de novo.')
     } finally {
-      setBusy(false);
+      setBusy(false)
     }
   }
 
   const row =
-    "flex items-center justify-between gap-6 border-b border-border/50 px-6 py-4 last:border-b-0";
-  const label = "text-[15px] text-foreground";
-  const hint = "pt-0.5 text-sm text-muted-foreground/70";
+    'flex items-center justify-between gap-6 border-b border-border/50 px-6 py-4 last:border-b-0'
+  const label = 'text-[15px] text-foreground'
+  const hint = 'pt-0.5 text-sm text-muted-foreground/70'
 
   /**
    * Exclusão total da conta (LGPD): dados + registro do tenant + usuário no
@@ -112,46 +112,46 @@ export function TenantSettingsPage() {
    * senha e com Google).
    */
   function openWipe() {
-    setWipeConfirm("");
-    setWipeError("");
-    setWipeOpen(true);
+    setWipeConfirm('')
+    setWipeError('')
+    setWipeOpen(true)
   }
 
   async function confirmWipe() {
-    if (wipeBusy || !wipeReady) return;
-    setWipeBusy(true);
-    setWipeError("");
+    if (wipeBusy || !wipeReady) return
+    setWipeBusy(true)
+    setWipeError('')
     try {
-      const res = await fetch("/api/tenant/account", { method: "DELETE" });
+      const res = await fetch('/api/tenant/account', { method: 'DELETE' })
       if (!res.ok) {
-        setWipeError("Não foi possível apagar. Tente de novo.");
-        setWipeBusy(false);
-        return;
+        setWipeError('Não foi possível apagar. Tente de novo.')
+        setWipeBusy(false)
+        return
       }
     } catch {
-      setWipeError("Sem conexão com o servidor. Tente de novo.");
-      setWipeBusy(false);
-      return;
+      setWipeError('Sem conexão com o servidor. Tente de novo.')
+      setWipeBusy(false)
+      return
     }
     try {
-      await fetch("/api/tenant/logout", { method: "POST" });
+      await fetch('/api/tenant/logout', { method: 'POST' })
     } catch {}
     try {
-      await supabase()?.auth.signOut();
+      await supabase()?.auth.signOut()
     } catch {}
-    clearTenantName();
+    clearTenantName()
     try {
-      sessionStorage.clear();
+      sessionStorage.clear()
     } catch {}
-    window.location.href = "/";
+    window.location.href = '/'
   }
 
-  type SettingsTab = "configuracoes" | "dados";
-  const [tab, setTab] = useState<SettingsTab>("configuracoes");
+  type SettingsTab = 'configuracoes' | 'dados'
+  const [tab, setTab] = useState<SettingsTab>('configuracoes')
   const tabs: Array<{ id: SettingsTab; label: string }> = [
-    { id: "configuracoes", label: "Configurações" },
-    { id: "dados", label: "Dados" },
-  ];
+    { id: 'configuracoes', label: 'Configurações' },
+    { id: 'dados', label: 'Dados' },
+  ]
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -167,11 +167,11 @@ export function TenantSettingsPage() {
                   key={t.id}
                   type="button"
                   onClick={() => setTab(t.id)}
-                  aria-current={tab === t.id ? "page" : undefined}
+                  aria-current={tab === t.id ? 'page' : undefined}
                   className={
                     tab === t.id
-                      ? "whitespace-nowrap rounded-lg bg-accent px-3 py-2 text-left text-sm font-medium text-accent-foreground md:w-full dark:bg-accent/60"
-                      : "whitespace-nowrap rounded-lg px-3 py-2 text-left text-sm text-foreground/70 hover:bg-accent/60 hover:text-accent-foreground md:w-full"
+                      ? 'whitespace-nowrap rounded-lg bg-accent px-3 py-2 text-left text-sm font-medium text-accent-foreground md:w-full dark:bg-accent/60'
+                      : 'whitespace-nowrap rounded-lg px-3 py-2 text-left text-sm text-foreground/70 hover:bg-accent/60 hover:text-accent-foreground md:w-full'
                   }
                 >
                   {t.label}
@@ -180,7 +180,7 @@ export function TenantSettingsPage() {
             </nav>
 
             <div className="min-w-0 flex-1">
-              {tab === "configuracoes" && (
+              {tab === 'configuracoes' && (
                 <div className="space-y-8">
                   <div>
                     <h1 className="text-2xl font-semibold">Preferências</h1>
@@ -217,7 +217,7 @@ export function TenantSettingsPage() {
                           <p className={hint}>Usado para login</p>
                         </div>
                         <p className="w-64 truncate rounded-lg border border-border/50 bg-muted px-4 py-2 text-[13px] text-muted-foreground">
-                          {email || "…"}
+                          {email || '…'}
                         </p>
                       </div>
                       <div className="flex items-center justify-end gap-3 px-6 py-4">
@@ -233,10 +233,10 @@ export function TenantSettingsPage() {
                         )}
                         <button
                           type="submit"
-                          disabled={busy || name.trim() === (savedName ?? "")}
+                          disabled={busy || name.trim() === (savedName ?? '')}
                           className="rounded-lg bg-foreground px-3 py-1 text-sm font-normal text-background disabled:opacity-40"
                         >
-                          {busy ? "Salvando…" : "Salvar"}
+                          {busy ? 'Salvando…' : 'Salvar'}
                         </button>
                       </div>
                     </form>
@@ -280,7 +280,7 @@ export function TenantSettingsPage() {
                   </section>
                 </div>
               )}
-              {tab === "dados" && (
+              {tab === 'dados' && (
                 <div className="space-y-8">
                   <div>
                     <h1 className="text-2xl font-bold">Dados</h1>
@@ -317,8 +317,8 @@ export function TenantSettingsPage() {
       <Dialog
         open={wipeOpen}
         onOpenChange={(open) => {
-          if (wipeBusy) return;
-          setWipeOpen(open);
+          if (wipeBusy) return
+          setWipeOpen(open)
         }}
       >
         <DialogContent className="sm:max-w-md">
@@ -331,13 +331,13 @@ export function TenantSettingsPage() {
           </DialogHeader>
           <form
             onSubmit={(e) => {
-              e.preventDefault();
-              void confirmWipe();
+              e.preventDefault()
+              void confirmWipe()
             }}
             className="space-y-4"
           >
             <p className="truncate rounded-lg border border-border/60 bg-muted px-4 py-2 text-[13px] text-muted-foreground">
-              {email || "…"}
+              {email || '…'}
             </p>
             <div>
               <input
@@ -370,12 +370,12 @@ export function TenantSettingsPage() {
                 disabled={wipeBusy || !wipeReady}
                 className="rounded-lg bg-destructive px-3 py-1.5 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-40"
               >
-                {wipeBusy ? "Excluindo…" : "Excluir conta"}
+                {wipeBusy ? 'Excluindo…' : 'Excluir conta'}
               </button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
     </div>
-  );
+  )
 }

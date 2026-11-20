@@ -206,6 +206,9 @@ export function useChat(model: string) {
     switchSession(newId)
   }, [switchSession])
 
+  // WHY mount-only: trocas de sessão passam por switchSession (que já conecta
+  // o SSE e carrega o histórico). Reagir a sessionId aqui duplicaria o
+  // connect + fetch por troca (disable no array de deps, mesmo padrão do AuthGate).
   useEffect(() => {
     latestRequestedSessionRef.current = sessionId
     connectSSE(sessionId)
@@ -214,6 +217,7 @@ export function useChat(model: string) {
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current)
       if (eventSourceRef.current) eventSourceRef.current.close()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return {
