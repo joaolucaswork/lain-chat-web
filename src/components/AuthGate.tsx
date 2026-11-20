@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { CheckCircle, Eye, EyeSlash } from '@phosphor-icons/react'
 import { RouteFallback } from '@/components/RouteFallback'
+import { ThemeToggle } from '@/components/ThemeToggle'
 import { isSupabaseConfigured, supabase } from '@/lib/supabase'
 import { setTenantName } from '@/hooks/useMe'
 
@@ -47,9 +49,9 @@ function FloatInput({
         autoFocus={autoFocus}
         maxLength={maxLength}
         inputMode={inputMode}
-        className={`peer w-full rounded border border-neutral-300 bg-white px-4 pb-2 pt-6 text-[15px] text-neutral-900 outline-none focus:border-neutral-900 ${passwordToggle ? 'pr-11' : ''}`}
+        className={`peer w-full rounded border border-neutral-300 bg-white px-4 pb-2 pt-6 text-[15px] text-neutral-900 outline-none focus:border-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:focus:border-neutral-200 ${passwordToggle ? 'pr-11' : ''}`}
       />
-      <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[15px] text-neutral-500 transition-all peer-focus:top-1.5 peer-focus:translate-y-0 peer-focus:text-xs peer-focus:text-neutral-700 peer-[:not(:placeholder-shown)]:top-1.5 peer-[:not(:placeholder-shown)]:translate-y-0 peer-[:not(:placeholder-shown)]:text-xs">
+      <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[15px] text-neutral-500 transition-all peer-focus:top-1.5 peer-focus:translate-y-0 peer-focus:text-xs peer-focus:text-neutral-700 peer-focus:dark:text-neutral-200 peer-[:not(:placeholder-shown)]:top-1.5 peer-[:not(:placeholder-shown)]:translate-y-0 peer-[:not(:placeholder-shown)]:text-xs dark:text-neutral-400">
         {label}
       </span>
       {passwordToggle && (
@@ -57,11 +59,28 @@ function FloatInput({
           type="button"
           onClick={passwordToggle.onToggle}
           aria-label={passwordToggle.show ? 'Ocultar senha' : 'Mostrar senha'}
-          className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-neutral-500"
+          className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-neutral-500 dark:text-neutral-400"
         >
           {passwordToggle.show ? <EyeSlash className="size-5" /> : <Eye className="size-5" />}
         </button>
       )}
+    </div>
+  )
+}
+
+/** Cabeçalho do gate: marca (volta à landing) + seletor de tema na mesma linha. */
+function GateHeader() {
+  return (
+    <div className="flex items-center justify-between px-8 pt-6">
+      <Link
+        to="/bem-vindo"
+        aria-label="Lain — início"
+        title="Início"
+        className="text-xl font-bold hover:opacity-70"
+      >
+        Lain
+      </Link>
+      <ThemeToggle />
     </div>
   )
 }
@@ -405,8 +424,8 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
 
   if (!isSupabaseConfigured()) {
     return (
-      <div className="flex h-dvh items-center justify-center bg-white p-6">
-        <p className="max-w-sm text-center text-sm text-neutral-500">
+      <div className="flex h-dvh items-center justify-center bg-white p-6 dark:bg-neutral-950">
+        <p className="max-w-sm text-center text-sm text-neutral-500 dark:text-neutral-400">
           Login indisponível: falta configurar as chaves do Supabase no servidor.
         </p>
       </div>
@@ -417,24 +436,24 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
   const blackBtn =
     'w-full rounded bg-primary px-4 py-3 font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40'
   const ghostBtn =
-    'flex w-full items-center justify-center gap-2 rounded border border-neutral-300 bg-white px-4 py-3 font-medium text-neutral-900 disabled:opacity-40'
+    'flex w-full items-center justify-center gap-2 rounded border border-neutral-300 bg-white px-4 py-3 font-medium text-neutral-900 disabled:opacity-40 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100'
 
   // Retorno do OAuth / clique no Google: skeleton da tela principal em vez
   // do formulário de login (flash regressivo). Checking inicial = blank
   // neutro (a checagem é local, ~ms) para não piscar skeleton errado.
   if (sessionCheck === 'oauth') return <RouteFallback variant="chat" />
-  if (sessionCheck === 'checking') return <div className="h-dvh bg-white" />
+  if (sessionCheck === 'checking') return <div className="h-dvh bg-white dark:bg-neutral-950" />
 
   // ── Etapa 1: só email (centralizado) ──
   if (step === 1) {
     return (
-      <div className="flex h-dvh flex-col bg-white text-neutral-900">
-        <div className="px-8 pt-6 text-xl font-bold">Lain</div>
+      <div className="flex h-dvh flex-col bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
+        <GateHeader />
         <div className="flex flex-1 items-center justify-center p-6">
           <form onSubmit={goStep2} className="w-full max-w-2xl space-y-4 text-center">
             <div className="mx-auto w-full max-w-md space-y-4">
               <h1 className="text-3xl font-normal">Entre ou crie uma conta</h1>
-              <p className="text-xs text-neutral-500">
+              <p className="text-xs text-neutral-500 dark:text-neutral-400">
                 Memória de longo prazo universal.
               </p>
               <button type="button" onClick={() => void google()} disabled={busy} className={ghostBtn}>
@@ -464,7 +483,7 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
                 ].map((perk) => (
                   <div key={perk} className="flex gap-2">
                     <CheckCircle className="mt-0.5 size-5 shrink-0 text-neutral-700" />
-                    <p className="text-xs leading-relaxed text-neutral-600 sm:text-[13px]">{perk}</p>
+                    <p className="text-xs leading-relaxed text-neutral-600 dark:text-neutral-400 sm:text-[13px]">{perk}</p>
                   </div>
                 ))}
               </div>
@@ -479,18 +498,18 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
   const step2Valid =
     isSignup ? name.trim().length > 0 && password.length >= 6 : password.length >= 6
   return (
-    <div className="flex h-dvh flex-col bg-white text-neutral-900">
-      <div className="px-8 pt-6 text-xl font-bold">Lain</div>
+    <div className="flex h-dvh flex-col bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
+      <GateHeader />
       <div className="flex flex-1 items-start justify-start p-6 sm:items-center">
         <form
           onSubmit={(e) => void (method === 'password' ? submitStep2(e) : verifyCode(e))}
           className="w-full max-w-md space-y-5 px-4 text-left sm:px-12"
         >
           <h1 className="text-2xl font-bold">{isSignup ? 'Crie sua conta' : 'Bem-vindo de volta!'}</h1>
-          <p className="text-sm text-neutral-600">
+          <p className="text-sm text-neutral-600 dark:text-neutral-400">
             {isSignup ? 'Criando a conta como' : 'Entrando como'} {email.trim()}.
           </p>
-          <div className="flex gap-1 rounded-full bg-neutral-100 p-1" role="tablist" aria-label="Método de acesso">
+          <div className="flex gap-1 rounded-full bg-neutral-100 p-1 dark:bg-neutral-800" role="tablist" aria-label="Método de acesso">
             {(['password', 'code'] as const).map((m) => (
               <button
                 key={m}
@@ -503,8 +522,8 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
                 }}
                 className={
                   method === m
-                    ? 'flex-1 rounded-full bg-white px-3 py-1.5 text-[13px] font-medium text-neutral-900 shadow-sm'
-                    : 'flex-1 rounded-full px-3 py-1.5 text-[13px] text-neutral-500'
+                    ? 'flex-1 rounded-full bg-white px-3 py-1.5 text-[13px] font-medium text-neutral-900 shadow-sm dark:bg-neutral-950 dark:text-neutral-100'
+                    : 'flex-1 rounded-full px-3 py-1.5 text-[13px] text-neutral-500 dark:text-neutral-400'
                 }
               >
                 {m === 'password' ? 'Senha' : 'Código por e-mail'}
@@ -526,11 +545,11 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
                   passwordToggle={{ show: showPassword, onToggle: () => setShowPassword((v) => !v) }}
                 />
                 {isSignup && (
-                  <p className="pt-1 text-xs text-neutral-500">Crie uma senha com pelo menos 6 caracteres.</p>
+                  <p className="pt-1 text-xs text-neutral-500 dark:text-neutral-400">Crie uma senha com pelo menos 6 caracteres.</p>
                 )}
               </div>
               {error && <p className="text-sm text-rose-600">{error}</p>}
-              {info && <p className="text-sm text-neutral-600">{info}</p>}
+              {info && <p className="text-sm text-neutral-600 dark:text-neutral-400">{info}</p>}
               <button type="submit" disabled={busy || !step2Valid} className={blackBtn}>
                 {busy ? 'Aguarde…' : isSignup ? 'Criar conta' : 'Entrar'}
               </button>
@@ -542,12 +561,12 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
               )}
               {!otpSent ? (
                 <>
-                  <p className="text-sm text-neutral-600">
+                  <p className="text-sm text-neutral-600 dark:text-neutral-400">
                     Vamos enviar um código de 6 dígitos para {email.trim()}.
                     {isSignup ? ' Ele cria sua conta na hora.' : ''}
                   </p>
                   {error && <p className="text-sm text-rose-600">{error}</p>}
-                  {info && <p className="text-sm text-neutral-600">{info}</p>}
+                  {info && <p className="text-sm text-neutral-600 dark:text-neutral-400">{info}</p>}
                   <button type="button" onClick={() => void sendCode()} disabled={busy} className={blackBtn}>
                     {busy ? 'Enviando…' : 'Enviar código'}
                   </button>
@@ -564,11 +583,11 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
                     inputMode="numeric"
                   />
                   {error && <p className="text-sm text-rose-600">{error}</p>}
-                  {info && <p className="text-sm text-neutral-600">{info}</p>}
+                  {info && <p className="text-sm text-neutral-600 dark:text-neutral-400">{info}</p>}
                   <button type="submit" disabled={busy || otp.trim().length < 6} className={blackBtn}>
                     {busy ? 'Aguarde…' : isSignup ? 'Verificar e criar conta' : 'Verificar e entrar'}
                   </button>
-                  <p className="text-sm text-neutral-600">
+                  <p className="text-sm text-neutral-600 dark:text-neutral-400">
                     Não recebeu?{' '}
                     <button
                       type="button"
@@ -583,7 +602,7 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
               )}
             </>
           )}
-          <p className="text-sm text-neutral-600">
+          <p className="text-sm text-neutral-600 dark:text-neutral-400">
             Email errado?{' '}
             <button
               type="button"
