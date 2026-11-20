@@ -1,19 +1,16 @@
 import { useEffect, useRef } from 'react'
 
 /**
- * Painel direito do hero (/bem-vindo): fundo Lain (ruído + scanlines)
- * com campo de glifos foscos que foge do mouse. Sem neon: os blobs são
- * só posições invisíveis à deriva que moldam onde os glifos acendem.
- * Reduzido a estático sob prefers-reduced-motion.
+ * Painel direito do hero (/bem-vindo): bloco cheio de glifos verdes
+ * (katakana + ASCII, o "ASCII em movimento" da Adaline) com scanlines
+ * recortadas nos próprios glifos. O mouse empurra os glifos e os acende
+ * por perto. Reduzido a estático sob prefers-reduced-motion.
  */
 
-const BLOBS = 7
 const GLYPHS = 'アイウエオカキクケコサシスセソ01<>*+#$%&?/\\|_='
 const CELL = 15
 const MOUSE_R = 170
 const PUSH = 52
-
-type Blob = { bx: number; by: number; r: number; sp: number; ph: number; x: number; y: number }
 
 export function GooPanel() {
   const ref = useRef<HTMLCanvasElement>(null)
@@ -28,15 +25,6 @@ export function GooPanel() {
     let h = 0
     const dpr = Math.min(window.devicePixelRatio || 1, 2)
     const mouse = { x: -9999, y: -9999 }
-    const blobs: Blob[] = Array.from({ length: BLOBS }, (_, i) => ({
-      bx: 0.2 + 0.6 * ((i * 0.37) % 1),
-      by: 0.28 + 0.5 * ((i * 0.53) % 1),
-      r: 0.09 + 0.05 * ((i * 0.29) % 1),
-      sp: 0.00035 + 0.0002 * ((i * 0.41) % 1),
-      ph: i * 1.7,
-      x: 0,
-      y: 0,
-    }))
     let cols = 0
     let rows = 0
     let cells: Array<{ ch: string; b: number }> = []
@@ -79,24 +67,7 @@ export function GooPanel() {
 
     const draw = (now: number) => {
       const t = now - t0
-      const m = Math.min(w, h)
-      const cx = w / 2
-      const cy = h / 2
       ctx.clearRect(0, 0, w, h)
-
-      // Blobs invisíveis: só posições à deriva (foge do mouse).
-      for (const b of blobs) {
-        const x = b.bx * w + Math.sin(t * b.sp + b.ph) * w * 0.08
-        const y = b.by * h + Math.cos(t * b.sp * 1.3 + b.ph) * h * 0.08
-        const dx = x - mouse.x
-        const dy = y - mouse.y
-        const d = Math.hypot(dx, dy)
-        const push = d < 160 && d > 0.01 ? ((160 - d) / 160) * 46 : 0
-        b.x = x + (dx / (d || 1)) * push
-        b.y = y + (dy / (d || 1)) * push
-      }
-
-      // Glifos foscos onde o campo está + repel direto do mouse.
       const yOff = (t / 1000) * 9 % CELL
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
@@ -108,28 +79,13 @@ export function GooPanel() {
           }
           const x = c * CELL
           const y = r * CELL - CELL + yOff
-          let f = 0
-          for (const b of blobs) {
-            const br = b.r * m * 0.7
-            const dd = (x - b.x) * (x - b.x) + (y - b.y) * (y - b.y)
-            f += Math.exp(-dd / (2 * br * br))
-          }
-          if (f < 0.35) continue
           const dx = x - mouse.x
           const dy = y - mouse.y
           const md = Math.hypot(dx, dy)
           const near = md < MOUSE_R && md > 0.01 ? (MOUSE_R - md) / MOUSE_R : 0
-          const px = x + (dx / (md || 1)) * near * PUSH
-          const py = y + (dy / (md || 1)) * near * PUSH
-          // Máscara radial elíptica: 1 no centro, 0 nas bordas (sem bloco).
-          const ex = (px - cx) / (w * 0.5)
-          const ey = (py - cy) / (h * 0.5)
-          const ed = Math.hypot(ex, ey)
-          const mask = Math.max(0, 1 - ed)
-          if (mask <= 0.02) continue
-          const a = Math.min(0.8, cell.b * mask * (0.55 + near * 0.9))
+          const a = Math.min(0.8, cell.b * (0.45 + near * 0.9))
           ctx.fillStyle = `rgba(190, 242, 100, ${a.toFixed(3)})`
-          ctx.fillText(cell.ch, px, py)
+          ctx.fillText(cell.ch, x + (dx / (md || 1)) * near * PUSH, y + (dy / (md || 1)) * near * PUSH)
         }
       }
       // Scanlines só no formato dos glifos: apaga 1px a cada 4px do canvas.
