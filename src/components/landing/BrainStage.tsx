@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { GooPanel } from '@/components/GooPanel'
 import { GLYPH_ORDER, createGlyphAtlas } from './glyphAtlas'
 import { FRAG_SRC, LINE_FRAG_SRC, LINE_VERT_SRC, VERT_SRC } from './brainShaders'
-import { buildBrainGeometry, buildSynapses } from './brainGeometry'
+import { buildBrainGeometry, buildSynapses, type BrainCloud } from './brainGeometry'
 import type { LandingProgress } from './useLandingProgress'
 
 /**
@@ -75,18 +75,20 @@ function bindAttrib(
   gl.vertexAttribDivisor(loc, divisor)
 }
 
-/** Grade jitter que cobre o stage (estado Hero). */
-function makeHomePositions(n: number, w: number, h: number): Float32Array {
-  const cols = Math.max(1, Math.ceil(Math.sqrt((n * w) / Math.max(1, h))))
-  const rows = Math.max(1, Math.ceil(n / cols))
-  const home = new Float32Array(n * 2)
-  for (let i = 0; i < n; i++) {
-    const c = i % cols
-    const r = Math.floor(i / cols) % rows
-    home[i * 2] = ((c + 0.5) / cols) * w + (Math.random() - 0.5) * (w / cols) * 0.6
-    home[i * 2 + 1] = ((r + 0.5) / rows) * h + (Math.random() - 0.5) * (h / rows) * 0.6
+/** Grade exata do GooPanel (CELL=15, sem jitter): mesma separação do original. */
+function makeHomeGrid(w: number, h: number): { home: Float32Array; count: number } {
+  const cols = Math.max(1, Math.ceil(w / CELL))
+  const rows = Math.max(1, Math.ceil(h / CELL) + 1)
+  const count = cols * rows
+  const home = new Float32Array(count * 2)
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const i = r * cols + c
+      home[i * 2] = c * CELL
+      home[i * 2 + 1] = r * CELL - CELL
+    }
   }
-  return home
+  return { home, count }
 }
 
 /** Projeção CPU espelhando brainProject (p/ picking do pulso no hover). */
@@ -159,17 +161,14 @@ export function BrainStage({
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
 
     const desktop = window.matchMedia?.('(min-width: 1024px)').matches ?? true
-    const N = desktop ? 3500 : 1800
-    const E = desktop ? 220 : 120
-    const cloud = buildBrainGeometry(N)
-    const pairs = buildSynapses(cloud.positions, cloud.lobe, E)
-    const glyphs = new Float32Array(N)
-    for (let i = 0; i < N; i++) glyphs[i] = (Math.random() * GLYPH_ORDER.length) | 0
-    const crests: number[] = []
-    for (let i = 0; i < N; i++) {
-      if (cloud.ridge[i] > 0.55 && cloud.lobe[i] <= 4) crests.push(i)
-    }
-    const crestPool = crests.length > 0 ? crests : Array.from({ length: N }, (_, i) => i)
+    // Nuvem, pares e glifos: N vem da grade exata (paridade com o GooPanel) e
+    // tudo é reconstruído no refill se a grade mudar (resize, rotação).
+    let N = 0
+    let E = 0
+    let cloud: BrainCloud | null = null
+    let pairs: Uint32Array = new Uint32Array(0)
+    let glyphs: Float32Array = new Float32Array(0)
+    let crestPool: number[] = [0]
 
     // VAO dos pontos: quad estático + instâncias [home2 brain3 meta4].
     const vaoP = gl.createVertexArray()
@@ -185,7 +184,7 @@ export function BrainStage({
     bindAttrib(gl, progP, 'aUV', 2, 16, 8, 0)
     const instVBO = gl.createBuffer()
     gl.bindBuffer(gl.ARRAY_BUFFER, instVBO)
-    gl.bufferData(gl.ARRAY_BUFFER, N * 9 * 4, gl.DYNAMIC_DRAW)
+    gl.bufferData(gl.ARRAY_BUFFER, 4, gl.DYNAMIC_DRAW)
     bindAttrib(gl, progP, 'aHomePos', 2, 36, 0, 1)
     bindAttrib(gl, progP, 'aBrainPos', 3, 36, 8, 1)
     bindAttrib(gl, progP, 'aMeta', 4, 36, 20, 1)
@@ -196,7 +195,7 @@ export function BrainStage({
     gl.bindVertexArray(vaoL)
     const lineVBO = gl.createBuffer()
     gl.bindBuffer(gl.ARRAY_BUFFER, lineVBO)
-    gl.bufferData(gl.ARRAY_BUFFER, E * 2 * 7 * 4, gl.DYNAMIC_DRAW)
+    gl.bufferData(gl.ARRAY_BUFFER, 4, gl.DYNAMIC_DRAW)
     bindAttrib(gl, progL, 'aHome', 2, 28, 0, 0)
     bindAttrib(gl, progL, 'aBrain', 3, 28, 8, 0)
     bindAttrib(gl, progL, 'aSeed', 1, 28, 20, 0)
@@ -207,18 +206,39 @@ export function BrainStage({
     let h = 1
     let dpr = 1
     const refill = () => {
-      const home = makeHomePositions(N, w, h)
+      const { home, count } = makeHomeGrid(w, h)
+      if (!cloud || count !== N) {
+        // Grade mudou: reconstrói nuvem, pares e buffers (VAO guarda só
+        // stride/offsets, então o realloc não invalida os atributos).
+        N = count
+        E = Math.max(40, Math.round(N * 0.063))
+        cloud = buildBrainGeometry(N)
+        pairs = buildSynapses(cloud.positions, cloud.lobe, E)
+        glyphs = new Float32Array(N)
+        for (let i = 0; i < N; i++) glyphs[i] = (Math.random() * GLYPH_ORDER.length) | 0
+        const crests: number[] = []
+        for (let i = 0; i < N; i++) {
+          if (cloud.ridge[i] > 0.55 && cloud.lobe[i] <= 4) crests.push(i)
+        }
+        crestPool = crests.length > 0 ? crests : Array.from({ length: N }, (_, i) => i)
+        gl.bindBuffer(gl.ARRAY_BUFFER, instVBO)
+        gl.bufferData(gl.ARRAY_BUFFER, N * 9 * 4, gl.DYNAMIC_DRAW)
+        gl.bindBuffer(gl.ARRAY_BUFFER, lineVBO)
+        gl.bufferData(gl.ARRAY_BUFFER, E * 2 * 7 * 4, gl.DYNAMIC_DRAW)
+      }
+      const c = cloud
+      if (!c || N === 0) return
       const inst = new Float32Array(N * 9)
       for (let i = 0; i < N; i++) {
         inst[i * 9] = home[i * 2]
         inst[i * 9 + 1] = home[i * 2 + 1]
-        inst[i * 9 + 2] = cloud.positions[i * 3]
-        inst[i * 9 + 3] = cloud.positions[i * 3 + 1]
-        inst[i * 9 + 4] = cloud.positions[i * 3 + 2]
-        inst[i * 9 + 5] = cloud.seeds[i]
+        inst[i * 9 + 2] = c.positions[i * 3]
+        inst[i * 9 + 3] = c.positions[i * 3 + 1]
+        inst[i * 9 + 4] = c.positions[i * 3 + 2]
+        inst[i * 9 + 5] = c.seeds[i]
         inst[i * 9 + 6] = glyphs[i]
-        inst[i * 9 + 7] = cloud.ridge[i]
-        inst[i * 9 + 8] = cloud.lobe[i]
+        inst[i * 9 + 7] = c.ridge[i]
+        inst[i * 9 + 8] = c.lobe[i]
       }
       gl.bindBuffer(gl.ARRAY_BUFFER, instVBO)
       gl.bufferSubData(gl.ARRAY_BUFFER, 0, inst)
@@ -231,11 +251,11 @@ export function BrainStage({
           const o = (e * 2 + k) * 7
           lines[o] = home[idx * 2]
           lines[o + 1] = home[idx * 2 + 1]
-          lines[o + 2] = cloud.positions[idx * 3]
-          lines[o + 3] = cloud.positions[idx * 3 + 1]
-          lines[o + 4] = cloud.positions[idx * 3 + 2]
-          lines[o + 5] = (cloud.seeds[a] + cloud.seeds[b]) / 2
-          lines[o + 6] = (cloud.ridge[a] + cloud.ridge[b]) / 2
+          lines[o + 2] = c.positions[idx * 3]
+          lines[o + 3] = c.positions[idx * 3 + 1]
+          lines[o + 4] = c.positions[idx * 3 + 2]
+          lines[o + 5] = (c.seeds[a] + c.seeds[b]) / 2
+          lines[o + 6] = (c.ridge[a] + c.ridge[b]) / 2
         }
       }
       gl.bindBuffer(gl.ARRAY_BUFFER, lineVBO)
@@ -243,8 +263,10 @@ export function BrainStage({
     }
     const resize = () => {
       const rect = canvas.getBoundingClientRect()
-      w = Math.max(1, rect.width)
-      h = Math.max(1, rect.height)
+      // Instância oculta (display:none) mede 0: usa mínimo p/ nuvem válida;
+      // o RO dispara de novo ao aparecer e o refill reconstrói na medida real.
+      w = Math.max(50, rect.width)
+      h = Math.max(50, rect.height)
       dpr = Math.min(window.devicePixelRatio || 1, desktop ? 2 : 1.5)
       canvas.width = Math.round(w * dpr)
       canvas.height = Math.round(h * dpr)
@@ -300,14 +322,16 @@ export function BrainStage({
     let raf = 0
     const lastDrawn = { morph: -1, pulse: -1, x: 0, y: 0 }
 
-    const firePulse = (idx: number, now: number) => {
-      pulseOrigin[0] = cloud.positions[idx * 3]
-      pulseOrigin[1] = cloud.positions[idx * 3 + 1]
-      pulseOrigin[2] = cloud.positions[idx * 3 + 2]
+    const firePulse = (positions: Float32Array, idx: number, now: number) => {
+      pulseOrigin[0] = positions[idx * 3]
+      pulseOrigin[1] = positions[idx * 3 + 1]
+      pulseOrigin[2] = positions[idx * 3 + 2]
       pulseStart = now
     }
 
     const draw = (now: number) => {
+      const c = cloud
+      if (!c || N === 0) return
       const morph = fixedMorph ?? progressRef.current.morph
       const boost = progressRef.current.pulse
       const tMs = still ? 0 : now - t0
@@ -353,7 +377,7 @@ export function BrainStage({
       const tiltX = still ? 0.15 : 0.12 + py * 0.35 * morph
       // Pulsos: automáticos (ritmo sobe com o boost da Seção 3) + hover.
       if (!still && morph > 0.75 && now - lastAuto > 3800 - 1800 * boost) {
-        firePulse(crestPool[(Math.random() * crestPool.length) | 0], now)
+        firePulse(c.positions, crestPool[(Math.random() * crestPool.length) | 0], now)
         lastAuto = now
       }
       if (morph > 0.75 && active && now - lastHover > 1400) {
@@ -361,7 +385,7 @@ export function BrainStage({
         let bd = scale * 1.3 * (scale * 1.3)
         for (let i = 0; i < N; i += 7) {
           const p = projectCPU(
-            cloud.positions[i * 3], cloud.positions[i * 3 + 1], cloud.positions[i * 3 + 2],
+            c.positions[i * 3], c.positions[i * 3 + 1], c.positions[i * 3 + 2],
             angleY, tiltX, scale, cx, cyy,
           )
           const dx = p.x - mouse.x
@@ -373,7 +397,7 @@ export function BrainStage({
           }
         }
         if (best >= 0) {
-          firePulse(best, now)
+          firePulse(c.positions, best, now)
           lastHover = now
         }
       }
