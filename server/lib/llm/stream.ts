@@ -105,7 +105,7 @@ export async function callLlmStream(
   tools: Array<Record<string, unknown>>,
   onToken: (t: string) => void,
   signal?: AbortSignal,
-): Promise<{ content: string; toolCalls: LlmToolCall[] }> {
+): Promise<{ content: string; toolCalls: LlmToolCall[]; finish: string[] }> {
   const llmKey = getLlmKey();
   if (!llmKey) throw new Error('LLM key not set (configure em Settings ou via OPENROUTER_API_KEY)');
   // Timeout próprio por turno (120s): stream travado não pode prender o chat.
@@ -161,7 +161,7 @@ export async function callLlmStream(
     console.error(`[bff] empty LLM response (model=${model} finish=[${acc.finishReasons.join(',')}] reasoningChars=${acc.reasoningChars} last=${acc.lastRaw})`);
     throw new Error('EMPTY_LLM_RESPONSE');
   }
-  return { content: acc.content, toolCalls };
+  return { content: acc.content, toolCalls, finish: acc.finishReasons };
 }
 
 async function pumpStream(
@@ -194,7 +194,7 @@ export async function callLlmStreamWithRetry(
   onToken: (t: string) => void,
   signal?: AbortSignal,
   attempts = 2,
-): Promise<{ content: string; toolCalls: LlmToolCall[] }> {
+): Promise<{ content: string; toolCalls: LlmToolCall[]; finish: string[] }> {
   let lastErr: unknown = null;
   for (let i = 0; i < attempts; i++) {
     if (signal?.aborted) throw new Error('STOPPED');

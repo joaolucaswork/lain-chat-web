@@ -99,12 +99,15 @@ export async function processMessage(session: Session, userMessage: string, sign
   // 3. Loop de tools (máx 3 turnos) com stream do texto
   let streamed = false;
   let finalText = '';
+  let usedTool = false;
   for (let turn = 0; turn < 3; turn++) {
-    const { content, toolCalls } = await callLlmStreamWithRetry(apiMessages, session.model, MEM_TOOLS, (token) => {
+    const { content, toolCalls, finish } = await callLlmStreamWithRetry(apiMessages, session.model, MEM_TOOLS, (token) => {
       streamed = true;
       broadcast(stream, 'token', { text: token });
     }, signal);
+    console.log(`[bff] llm turn=${turn} contentChars=${content.length} tools=[${toolCalls.map((t) => t.name).join(',')}] finish=[${(finish ?? []).join(',')}]`);
     if (toolCalls.length === 0) { finalText = content; break; }
+    usedTool = true;
     finalText = content; // normalmente vazio quando há tool calls
     apiMessages.push({
       role: 'assistant', content: content || null,
@@ -113,8 +116,15 @@ export async function processMessage(session: Session, userMessage: string, sign
     for (const tc of toolCalls) {
       if (signal?.aborted) throw new Error('STOPPED');
       const result = await execLlmTool(tc, memKey);
+      console.log(`[bff] tool ${tc.name} args=${tc.args.slice(0, 120)} → ${result.length} chars`);
       apiMessages.push({ role: 'tool', tool_call_id: tc.id, content: result });
     }
+  }
+  // Watchdog do "anunciou mas não chamou": turno sem tool cujo texto promete
+  // verificação costuma ser o modelo narrando em vez de agir — loga para
+  // confirmar no próximo caso em vez de falhar silencioso.
+  if (!usedTool && /deixa eu ver|vou (buscar|verificar|checar|consultar)|vou dar uma olhada|um momentinho/i.test(finalText)) {
+    console.warn(`[bff] possível tool faltante (texto promete busca, 0 tools): ${finalText.slice(0, 160)}`);
   }
 
   // 4. Persiste só o texto final + finaliza (protocolo do frontend: token_end fecha o balão)
