@@ -9,12 +9,7 @@ import { useEffect, useRef } from 'react'
  */
 
 const BLOBS = 7
-/** Núcleos de brilho (centro → transparente); sem bola sólida. */
-const BLOOM = [
-  'rgba(101, 163, 13, 0.5)',
-  'rgba(132, 204, 22, 0.45)',
-  'rgba(190, 242, 100, 0.4)',
-]
+const COLORS = ['#4d7c0f', '#65a30d', '#84cc16']
 const GLYPHS = 'アイウエオカキクケコサシスセソ01<>*+#$%&?/\\|_='
 const CELL = 15
 
@@ -88,7 +83,8 @@ export function GooPanel() {
       const t = now - t0
       const m = Math.min(w, h)
 
-      // Camada 1: brilho radial (synth) — sem núcleo sólido.
+      // Camada 1: gosma em glow — mesmo formato, sem núcleo sólido
+      // (só blur, sem o contraste que endurecia em bolinha).
       gtx.clearRect(0, 0, w, h)
       blobs.forEach((b, i) => {
         const x = b.bx * w + Math.sin(t * b.sp + b.ph) * w * 0.08
@@ -99,13 +95,9 @@ export function GooPanel() {
         const push = d < 160 && d > 0.01 ? ((160 - d) / 160) * 46 : 0
         b.x = x + (dx / (d || 1)) * push
         b.y = y + (dy / (d || 1)) * push
-        const rad = b.r * m * 2.2
-        const grad = gtx.createRadialGradient(b.x, b.y, 0, b.x, b.y, rad)
-        grad.addColorStop(0, BLOOM[i % BLOOM.length])
-        grad.addColorStop(1, 'rgba(0, 0, 0, 0)')
-        gtx.fillStyle = grad
+        gtx.fillStyle = COLORS[i % COLORS.length]
         gtx.beginPath()
-        gtx.arc(b.x, b.y, rad, 0, Math.PI * 2)
+        gtx.arc(b.x, b.y, b.r * m, 0, Math.PI * 2)
         gtx.fill()
       })
 
@@ -147,7 +139,7 @@ export function GooPanel() {
       <canvas
         ref={gooRef}
         className="absolute inset-0 h-full w-full mix-blend-screen"
-        style={{ filter: 'blur(12px)' }}
+        style={{ filter: 'blur(28px)' }}
       />
       <canvas
         ref={glyphRef}
