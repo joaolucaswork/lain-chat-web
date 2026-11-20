@@ -30,6 +30,8 @@ export function GooPanel() {
     const mouse = { x: -9999, y: -9999 }
     // Cursor suavizado (lag do Viscose): o repel persegue, não pula.
     const sm = { x: -9999, y: -9999 }
+    // Força do repel: sobe rápido no over, desce devagar no out.
+    let glow = 1
     const blobs: Blob[] = Array.from({ length: BLOBS }, (_, i) => ({
       bx: 0.2 + 0.6 * ((i * 0.37) % 1),
       by: 0.28 + 0.5 * ((i * 0.53) % 1),
@@ -86,11 +88,9 @@ export function GooPanel() {
       const cy = h / 2
       ctx.clearRect(0, 0, w, h)
 
-      // Persegue o mouse (0.14/frame); fora do painel, relaxa de volta.
-      if (mouse.x < -9000) {
-        sm.x = -9999
-        sm.y = -9999
-      } else {
+      // Persegue o mouse (0.14/frame); no out a força decai devagar.
+      const active = mouse.x > -9000
+      if (active) {
         if (sm.x < -9000) {
           sm.x = mouse.x
           sm.y = mouse.y
@@ -99,6 +99,7 @@ export function GooPanel() {
           sm.y += (mouse.y - sm.y) * 0.14
         }
       }
+      glow += ((active ? 1 : 0) - glow) * 0.07
 
       // Blobs invisíveis: só posições à deriva (foge do mouse).
       for (const b of blobs) {
@@ -107,7 +108,7 @@ export function GooPanel() {
         const dx = x - sm.x
         const dy = y - sm.y
         const d = Math.hypot(dx, dy)
-        const push = d < 160 && d > 0.01 ? ((160 - d) / 160) * 46 : 0
+        const push = d < 160 && d > 0.01 ? ((160 - d) / 160) * 46 * glow : 0
         b.x = x + (dx / (d || 1)) * push
         b.y = y + (dy / (d || 1)) * push
       }
@@ -135,8 +136,8 @@ export function GooPanel() {
           const dy = y - sm.y
           const md = Math.hypot(dx, dy)
           const near = md < MOUSE_R && md > 0.01 ? (MOUSE_R - md) / MOUSE_R : 0
-          const px = x + (dx / (md || 1)) * near * PUSH
-          const py = y + (dy / (md || 1)) * near * PUSH
+          const px = x + (dx / (md || 1)) * near * PUSH * glow
+          const py = y + (dy / (md || 1)) * near * PUSH * glow
           // Radial aberto: cor chapada até perto da borda; fade só no
           // cantinho (pra não voltar o bloco).
           const ex = (px - cx) / (w * 0.5)
@@ -144,7 +145,7 @@ export function GooPanel() {
           const ed = Math.hypot(ex, ey)
           const edge = Math.min(1, Math.max(0, (1 - ed) / 0.15))
           if (edge <= 0.02) continue
-          const a = Math.min(0.8, cell.b * edge * (0.55 + near * 0.9))
+          const a = Math.min(0.8, cell.b * edge * (0.55 + near * glow * 0.9))
           ctx.fillStyle = `rgba(190, 242, 100, ${a.toFixed(3)})`
           ctx.fillText(cell.ch, px, py)
         }
