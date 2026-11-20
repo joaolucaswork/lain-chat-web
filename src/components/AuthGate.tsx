@@ -424,7 +424,7 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
 
   if (!isSupabaseConfigured()) {
     return (
-      <div className="flex h-dvh items-center justify-center bg-white p-6 dark:bg-neutral-950">
+      <div className="flex h-dvh items-center justify-center bg-white p-6 dark:bg-background">
         <p className="max-w-sm text-center text-sm text-neutral-500 dark:text-neutral-400">
           Login indisponível: falta configurar as chaves do Supabase no servidor.
         </p>
@@ -442,12 +442,12 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
   // do formulário de login (flash regressivo). Checking inicial = blank
   // neutro (a checagem é local, ~ms) para não piscar skeleton errado.
   if (sessionCheck === 'oauth') return <RouteFallback variant="chat" />
-  if (sessionCheck === 'checking') return <div className="h-dvh bg-white dark:bg-neutral-950" />
+  if (sessionCheck === 'checking') return <div className="h-dvh bg-white dark:bg-background" />
 
   // ── Etapa 1: só email (centralizado) ──
   if (step === 1) {
     return (
-      <div className="flex h-dvh flex-col bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
+      <div className="flex h-dvh flex-col bg-white text-neutral-900 dark:bg-background dark:text-neutral-100">
         <GateHeader />
         <div className="flex flex-1 items-center justify-center p-6">
           <form onSubmit={goStep2} className="w-full max-w-2xl space-y-4 text-center">
@@ -498,7 +498,7 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
   const step2Valid =
     isSignup ? name.trim().length > 0 && password.length >= 6 : password.length >= 6
   return (
-    <div className="flex h-dvh flex-col bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
+    <div className="flex h-dvh flex-col bg-white text-neutral-900 dark:bg-background dark:text-neutral-100">
       <GateHeader />
       <div className="flex flex-1 items-start justify-start p-6 sm:items-center">
         <form
@@ -522,7 +522,7 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
                 }}
                 className={
                   method === m
-                    ? 'flex-1 rounded-full bg-white px-3 py-1.5 text-[13px] font-medium text-neutral-900 shadow-sm dark:bg-neutral-950 dark:text-neutral-100'
+                    ? 'flex-1 rounded-full bg-white px-3 py-1.5 text-[13px] font-medium text-neutral-900 shadow-sm dark:bg-background dark:text-neutral-100'
                     : 'flex-1 rounded-full px-3 py-1.5 text-[13px] text-neutral-500 dark:text-neutral-400'
                 }
               >
