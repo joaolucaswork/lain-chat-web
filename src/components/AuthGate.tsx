@@ -479,7 +479,7 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
                   bare
                 />
               </div>
-              {error && <p className="text-sm text-rose-600">{error}</p>}
+              {error && <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>}
               <button type="submit" disabled={busy} className={blackBtn}>
                 {busy ? 'Aguarde…' : 'Continuar'}
               </button>
@@ -557,7 +557,7 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
                   <p className="pt-1 text-xs text-neutral-500 dark:text-neutral-400">Crie uma senha com pelo menos 6 caracteres.</p>
                 )}
               </div>
-              {error && <p className="text-sm text-rose-600">{error}</p>}
+              {error && <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>}
               {info && <p className="text-sm text-neutral-600 dark:text-neutral-400">{info}</p>}
               <button type="submit" disabled={busy || !step2Valid} className={blackBtn}>
                 {busy ? 'Aguarde…' : isSignup ? 'Criar conta' : 'Entrar'}
@@ -574,7 +574,7 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
                     Vamos enviar um código de 6 dígitos para {email.trim()}.
                     {isSignup ? ' Ele cria sua conta na hora.' : ''}
                   </p>
-                  {error && <p className="text-sm text-rose-600">{error}</p>}
+                  {error && <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>}
                   {info && <p className="text-sm text-neutral-600 dark:text-neutral-400">{info}</p>}
                   <button type="button" onClick={() => void sendCode()} disabled={busy} className={blackBtn}>
                     {busy ? 'Enviando…' : 'Enviar código'}
@@ -591,7 +591,7 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
                     maxLength={6}
                     inputMode="numeric"
                   />
-                  {error && <p className="text-sm text-rose-600">{error}</p>}
+                  {error && <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>}
                   {info && <p className="text-sm text-neutral-600 dark:text-neutral-400">{info}</p>}
                   <button type="submit" disabled={busy || otp.trim().length < 6} className={blackBtn}>
                     {busy ? 'Aguarde…' : isSignup ? 'Verificar e criar conta' : 'Verificar e entrar'}
