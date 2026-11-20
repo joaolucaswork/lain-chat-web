@@ -6,6 +6,10 @@
  * O chunk BRAIN_COMMON é a única fonte do transform 3D — pontos e linhas
  * nunca descolam na rotação.
  */
+import { GLYPH_ORDER } from './glyphAtlas'
+
+/** Nº de glifos no atlas — sorteio `0..GLYPH_COUNT` no shader. */
+const GLYPH_COUNT = `${GLYPH_ORDER.length}.0`
 
 const BRAIN_COMMON = `
 uniform vec2 uRes;
@@ -108,7 +112,7 @@ void main() {
   float q = floor(uTime * 4.0 + seed * 11.0);
   float g = glyph;
   if (h21(vec2(seed * 91.7, q * 13.3)) < 0.06) {
-    g = floor(h21(vec2(seed * 47.3, q * 7.7)) * 31.0);
+    g = floor(h21(vec2(seed * 47.3, q * 7.7)) * ${GLYPH_COUNT});
   }
   vUv = (aUV + vec2(mod(g, 8.0), floor(g / 8.0))) / 8.0;
   float bright = 0.25 + 0.75 * h21(vec2(g * 7.13 + 0.5, seed * 3.7));

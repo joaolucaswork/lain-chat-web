@@ -1,6 +1,11 @@
 /** Atlas de glifos 8x8 para o stage WebGL2 (Etapa 2: Hero, morph=0). */
 
-export const GLYPH_ORDER = 'アイウエオカキクケコサシスセソ01<>*+#$%&?/\\|_='
+/**
+ * Vocabulário de símbolos do stage (espelho do hero de referência Adaline:
+ * só ASCII + middle dot, sem katakana e sem dígitos). Cabe nos 64 slots
+ * do atlas 8x8; o shader sorteia `0..length`.
+ */
+export const GLYPH_ORDER = '!#$%&*+-./:;<=>?@\\^_|~·'
 export const ATLAS_COLS = 8
 export const ATLAS_ROWS = 8
 export const ATLAS_CELL = 40
