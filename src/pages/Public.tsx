@@ -1,6 +1,9 @@
+import { useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { GooPanel } from '@/components/GooPanel'
 import { ViscoseH1 } from '@/components/ViscoseH1'
+import { McpTabs } from '@/components/landing/McpTabs'
+import { useLandingProgress, type LandingProgress } from '@/components/landing/useLandingProgress'
 
 /**
  * Páginas públicas (fora do DemoGate/AuthGate): landing + privacidade +
@@ -9,11 +12,19 @@ import { ViscoseH1 } from '@/components/ViscoseH1'
  * Leves de propósito: import estático no bundle inicial, sem lazy.
  */
 
-function PublicShell({ children }: { children: React.ReactNode }) {
+function PublicShell({
+  children,
+  scrollRef,
+}: {
+  children: React.ReactNode
+  scrollRef?: React.RefObject<HTMLDivElement | null>
+}) {
   /* Landing sempre dark (fósforo verde sobre #131416), independente do tema. */
+  /* WHY scroll próprio: html/body têm overflow hidden (teclado virtual no
+     chat mobile) — a landing rola no próprio container sem tocar no global. */
   return (
-    <div className="dark flex min-h-dvh flex-col bg-background text-foreground">
-      <header className="flex items-center justify-between px-6 py-4 sm:px-10">
+    <div ref={scrollRef} className="dark flex h-dvh flex-col overflow-x-hidden overflow-y-auto bg-background text-foreground">
+      <header className="sticky top-0 z-20 flex items-center justify-between bg-background/80 px-6 py-4 backdrop-blur-md sm:px-10">
         <Link to="/bem-vindo" className="flex items-center gap-2">
           <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-lg font-bold text-primary-foreground">
             L
@@ -46,38 +57,157 @@ function PublicShell({ children }: { children: React.ReactNode }) {
   )
 }
 
-export function LandingPage() {
+/**
+ * Slot do stage direito. Etapa 1: GooPanel 2D. Etapa 2 troca por BrainStage
+ * WebGL2 lendo progressRef (morph/pulse) — nenhuma mudança no layout.
+ */
+function StageSlot({ progressRef }: { progressRef: React.RefObject<LandingProgress> }) {
+  void progressRef
   return (
-    <PublicShell>
-      <section className="mx-auto grid w-full max-w-6xl flex-1 items-center gap-10 px-6 py-12 sm:py-16 lg:grid-cols-2 lg:gap-6 lg:py-0">
-        <div className="text-left">
-          <p className="inline-block rounded-full border border-border px-3 py-1 font-mono text-[11px] tracking-[0.18em] text-muted-foreground">
-            MEMÓRIA DE LONGO PRAZO
-          </p>
-          <div className="mt-5">
-            <ViscoseH1 />
-          </div>
-          <p className="mt-4 max-w-md text-[15px] leading-relaxed text-muted-foreground sm:text-base">
-            A Lain lembra de você entre conversas — no chat, no cofre de memórias
-            e em qualquer agente de código via MCP.
-          </p>
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <Link
-              to="/"
-              className="rounded-full bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-            >
-              Entrar ou criar conta
-            </Link>
-            <a
-              href="mailto:jlucaswrk@gmail.com?subject=Lain"
-              className="rounded-full border border-border px-6 py-3 text-center text-sm font-medium text-foreground transition-colors hover:bg-accent"
-            >
-              Falar com a gente
-            </a>
-          </div>
-        </div>
+    <div className="flex h-full items-center">
+      <div className="w-full">
         <GooPanel />
-      </section>
+      </div>
+    </div>
+  )
+}
+
+function HeroCopy() {
+  return (
+    <div className="text-left">
+      <p className="inline-block rounded-full border border-border px-3 py-1 font-mono text-[11px] tracking-[0.18em] text-muted-foreground">
+        MEMÓRIA DE LONGO PRAZO
+      </p>
+      <div className="mt-5">
+        <ViscoseH1 />
+      </div>
+      <p className="mt-4 max-w-md text-[15px] leading-relaxed text-muted-foreground sm:text-base">
+        A Lain lembra de você entre conversas — no chat, no cofre de memórias
+        e em qualquer agente de código via MCP.
+      </p>
+      <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+        <Link
+          to="/"
+          className="rounded-full bg-primary px-6 py-3 text-center text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+        >
+          Entrar ou criar conta
+        </Link>
+        <a
+          href="mailto:jlucaswrk@gmail.com?subject=Lain"
+          className="rounded-full border border-border px-6 py-3 text-center text-sm font-medium text-foreground transition-colors hover:bg-accent"
+        >
+          Falar com a gente
+        </a>
+      </div>
+      <p className="mt-12 font-mono text-[11px] tracking-[0.18em] text-muted-foreground/70" aria-hidden>
+        ROLE ↓ PARA VER A MEMÓRIA TOMAR FORMA
+      </p>
+    </div>
+  )
+}
+
+function MemoryBlocks() {
+  const items = [
+    {
+      title: 'Extração silenciosa',
+      body: 'Fatos, preferências e projetos capturados em background do que você diz (remember) — sem poluir com texto genérico do modelo.',
+    },
+    {
+      title: 'Grafo de conexões',
+      body: 'Entidades e relações ligadas entre si (recall + grafo), trazendo o contexto exato em cada turno.',
+    },
+    {
+      title: 'Controle real no Cofre',
+      body: 'Revise, confirme, arquive ou apague qualquer memória; exclusão total de conta e dados quando quiser.',
+    },
+  ]
+  return (
+    <div className="mt-10 space-y-8">
+      {items.map((it) => (
+        <div key={it.title} className="border-l-2 border-primary/40 pl-5">
+          <h3 className="text-[15px] font-bold tracking-tight">{it.title}</h3>
+          <p className="mt-1 max-w-md text-sm leading-relaxed text-muted-foreground">{it.body}</p>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function ClosingCta() {
+  return (
+    <section className="border-t border-border">
+      <div className="mx-auto flex w-full max-w-6xl flex-col items-start gap-6 px-6 py-20 sm:px-10 lg:flex-row lg:items-center lg:justify-between">
+        <h2 className="font-display max-w-xl text-3xl font-medium tracking-[-0.02em] text-balance sm:text-4xl">
+          Comece com memória. Continue com contexto.
+        </h2>
+        <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
+          <Link
+            to="/"
+            className="rounded-full bg-primary px-6 py-3 text-center text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            Criar conta gratuita
+          </Link>
+          <Link
+            to="/docs/instalacao"
+            className="rounded-full border border-border px-6 py-3 text-center text-sm font-medium text-foreground transition-colors hover:bg-accent"
+          >
+            Conectar um agente
+          </Link>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+export function LandingPage() {
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+  const s2Ref = useRef<HTMLElement | null>(null)
+  const s3Ref = useRef<HTMLElement | null>(null)
+  const progressRef = useLandingProgress({ scroll: scrollRef, s2: s2Ref, s3: s3Ref })
+
+  return (
+    <PublicShell scrollRef={scrollRef}>
+      <div className="mx-auto w-full max-w-6xl flex-1 px-6 sm:px-10 lg:px-6">
+        <div className="lg:grid lg:grid-cols-2 lg:gap-10">
+          <div className="min-w-0">
+            <section aria-label="Apresentação" className="flex min-h-[calc(100dvh-4rem)] flex-col justify-center py-12">
+              <HeroCopy />
+              <div className="mt-10 lg:hidden" aria-hidden>
+                <GooPanel />
+              </div>
+            </section>
+            <section ref={s2Ref} aria-label="Como a Lain lembra" className="py-20 sm:py-28">
+              <p className="font-mono text-[11px] tracking-[0.18em] text-muted-foreground">
+                01 / MEMÓRIA ESTRUTURADA
+              </p>
+              <h2 className="font-display mt-4 max-w-md text-3xl font-medium tracking-[-0.02em] text-balance sm:text-4xl">
+                Cada conversa vira estrutura, não histórico perdido.
+              </h2>
+              <MemoryBlocks />
+            </section>
+            <section ref={s3Ref} aria-label="Use em qualquer agente" className="py-20 sm:py-28">
+              <p className="font-mono text-[11px] tracking-[0.18em] text-muted-foreground">
+                02 / MCP UNIVERSAL
+              </p>
+              <h2 className="font-display mt-4 max-w-md text-3xl font-medium tracking-[-0.02em] text-balance sm:text-4xl">
+                O mesmo cérebro no chat e no seu terminal.
+              </h2>
+              <p className="mt-4 max-w-md text-[15px] leading-relaxed text-muted-foreground">
+                A mesma memória em 1 comando — sem Docker, sem config manual.
+              </p>
+              <div className="mt-8 max-w-md">
+                <McpTabs />
+              </div>
+            </section>
+          </div>
+          <aside className="relative hidden min-h-0 lg:block" aria-hidden>
+            <div className="sticky top-16 h-[calc(100dvh-4rem)] overflow-hidden">
+              <StageSlot progressRef={progressRef} />
+            </div>
+          </aside>
+        </div>
+      </div>
+      <ClosingCta />
     </PublicShell>
   )
 }
