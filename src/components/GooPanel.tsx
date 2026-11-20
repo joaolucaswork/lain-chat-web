@@ -108,7 +108,7 @@ export function GooPanel() {
       <canvas
         ref={canvasRef}
         className="absolute inset-0 h-full w-full"
-        style={{ filter: 'blur(24px) contrast(var(--goo-contrast, 12))' }}
+        style={{ filter: 'blur(var(--goo-blur, 32px)) contrast(var(--goo-contrast, 6))' }}
       />
     </div>
   )
