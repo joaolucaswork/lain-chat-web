@@ -1,22 +1,16 @@
 import { useEffect, useRef } from 'react'
 
 /**
- * Painel goo do hero (/bem-vindo, lado direito — estilo Adaline).
- * Mesma técnica do morph do h1 (blur + threshold de alpha), mas contínua:
- * blobs à deriva que fundem/esticam fios entre si e reagem ao cursor.
- * Canvas 2D + CSS filter (GPU), sem Three.js — primo pobre do
- * planeShaders (smin) do Viscose, bom o bastante p/ o experimento.
+ * Painel direito do hero (/bem-vindo) — estética Serial Experiments Lain:
+ * goo de fósforo verde sobre preto + scanlines, ruído de sinal, sweep de
+ * refresh e anel de "protocolo" girando devagar. Canvas 2D + CSS (GPU),
+ * sem Three.js. Reduzido a estático sob prefers-reduced-motion.
  */
 
 const BLOBS = 7
+const COLORS = ['#3f6212', '#65a30d', '#84cc16']
 
 type Blob = { bx: number; by: number; r: number; sp: number; ph: number }
-
-function palette(): string[] {
-  const css = getComputedStyle(document.documentElement)
-  const g = (n: string, fb: string) => css.getPropertyValue(n).trim() || fb
-  return [g('--goo-1', '#65a30d'), g('--goo-2', '#84cc16'), g('--goo-3', '#a3e635')]
-}
 
 export function GooPanel() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -34,7 +28,7 @@ export function GooPanel() {
     const blobs: Blob[] = Array.from({ length: BLOBS }, (_, i) => ({
       bx: 0.2 + 0.6 * ((i * 0.37) % 1),
       by: 0.2 + 0.6 * ((i * 0.53) % 1),
-      r: 0.1 + 0.05 * ((i * 0.29) % 1),
+      r: 0.09 + 0.05 * ((i * 0.29) % 1),
       sp: 0.00035 + 0.0002 * ((i * 0.41) % 1),
       ph: i * 1.7,
     }))
@@ -63,29 +57,36 @@ export function GooPanel() {
     canvas.parentElement?.addEventListener('pointermove', onMove)
     canvas.parentElement?.addEventListener('pointerleave', onLeave)
 
-    let colors = palette()
-    const mo = new MutationObserver(() => {
-      colors = palette()
-    })
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
-
     const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
     let raf = 0
+    let dash = 0
     const t0 = performance.now()
 
     const draw = (now: number) => {
       const t = now - t0
       ctx.clearRect(0, 0, w, h)
       const m = Math.min(w, h)
+
+      // Anel de protocolo: tracejado girando, o "olho" por cima da gosma.
+      dash -= 0.15
+      ctx.save()
+      ctx.strokeStyle = 'rgba(132, 204, 22, 0.4)'
+      ctx.lineWidth = 1.5
+      ctx.setLineDash([6, 12])
+      ctx.lineDashOffset = dash
+      ctx.beginPath()
+      ctx.arc(w / 2, h / 2, m * 0.36, 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.restore()
+
       blobs.forEach((b, i) => {
         const x = b.bx * w + Math.sin(t * b.sp + b.ph) * w * 0.08
         const y = b.by * h + Math.cos(t * b.sp * 1.3 + b.ph) * h * 0.08
-        // Cursor empurra o blob (força do Viscose, versão 2D).
         const dx = x - mouse.x
         const dy = y - mouse.y
         const d = Math.hypot(dx, dy)
         const push = d < 160 && d > 0.01 ? ((160 - d) / 160) * 46 : 0
-        ctx.fillStyle = colors[i % colors.length]
+        ctx.fillStyle = COLORS[i % COLORS.length]
         ctx.beginPath()
         ctx.arc(x + (dx / (d || 1)) * push, y + (dy / (d || 1)) * push, b.r * m, 0, Math.PI * 2)
         ctx.fill()
@@ -97,7 +98,6 @@ export function GooPanel() {
     return () => {
       cancelAnimationFrame(raf)
       ro.disconnect()
-      mo.disconnect()
       canvas.parentElement?.removeEventListener('pointermove', onMove)
       canvas.parentElement?.removeEventListener('pointerleave', onLeave)
     }
@@ -107,9 +107,19 @@ export function GooPanel() {
     <div className="relative h-72 overflow-hidden sm:h-96 lg:h-[540px]" aria-hidden>
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 h-full w-full"
-        style={{ filter: 'blur(var(--goo-blur, 32px)) contrast(var(--goo-contrast, 6))' }}
+        className="lain-flicker absolute inset-0 h-full w-full"
+        style={{ filter: 'blur(24px) contrast(24)' }}
       />
+      {/* scanlines */}
+      <div className="lain-scanlines pointer-events-none absolute inset-0" />
+      {/* ruído de sinal */}
+      <div className="lain-noise pointer-events-none absolute inset-0" />
+      {/* sweep de refresh */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="lain-sweep absolute inset-x-0 h-28" />
+      </div>
+      {/* vinheta p/ afundar as bordas no preto */}
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_55%,rgba(0,0,0,0.55)_100%)]" />
     </div>
   )
 }

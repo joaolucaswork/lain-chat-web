@@ -10,8 +10,9 @@ import { ViscoseH1 } from '@/components/ViscoseH1'
  */
 
 function PublicShell({ children }: { children: React.ReactNode }) {
+  /* Landing sempre dark (fósforo verde sobre #131416), independente do tema. */
   return (
-    <div className="flex min-h-dvh flex-col bg-background text-foreground">
+    <div className="dark flex min-h-dvh flex-col bg-background text-foreground">
       <header className="flex items-center justify-between px-6 py-4 sm:px-10">
         <Link to="/bem-vindo" className="flex items-center gap-2">
           <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-lg font-bold text-primary-foreground">
