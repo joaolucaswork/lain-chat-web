@@ -439,7 +439,7 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
   const blackBtn =
     'w-full rounded bg-primary px-4 py-3 font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40'
   const ghostBtn =
-    'flex w-full items-center justify-center gap-2 rounded border border-transparent bg-field px-4 py-3 font-medium text-neutral-900 disabled:opacity-40 dark:text-neutral-100'
+    'flex w-full items-center justify-center gap-2 rounded border border-transparent bg-field px-4 py-3 font-medium text-neutral-900 transition-colors hover:bg-field-hover disabled:opacity-40 dark:text-neutral-100'
 
   // Retorno do OAuth / clique no Google: skeleton da tela principal em vez
   // do formulário de login (flash regressivo). Checking inicial = blank
