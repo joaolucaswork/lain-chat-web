@@ -1,8 +1,9 @@
 import { Suspense, lazy } from 'react'
 import { motion } from 'motion/react'
-import { useOutletContext } from 'react-router-dom'
+import { Link, useOutletContext } from 'react-router-dom'
 import { ChatMessages } from '@/components/ChatMessages'
 import { ChatInput } from '@/components/ChatInput'
+import { ThemeToggle } from '@/components/ThemeToggle'
 import { RecommendedCardsSkeleton } from '@/components/recent/RecommendedCards'
 import { InitialSkeleton } from '@/components/recent/RecentMemoriesSkeleton'
 import { readHomeHasMemories } from '@/lib/homeMemories'
@@ -36,11 +37,22 @@ export function ChatPage() {
         >
           <List className="size-5" />
         </button>
+        <Link
+          to="/"
+          aria-label="Lain — início"
+          title="Início"
+          className="shrink-0 text-[15px] font-bold tracking-tight text-foreground hover:opacity-70"
+        >
+          Lain
+        </Link>
         {sessionTitle || !isEmpty ? (
-          <h1 className="flex-1 truncate text-left text-[15px] font-medium text-muted-foreground">
+          <h1 className="min-w-0 flex-1 truncate text-left text-[15px] font-medium text-muted-foreground">
             {sessionTitle || 'Nova conversa'}
           </h1>
-        ) : null}
+        ) : (
+          <span className="flex-1" aria-hidden />
+        )}
+        <ThemeToggle />
       </div>
 
       {isEmpty ? (

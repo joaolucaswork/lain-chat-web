@@ -85,8 +85,10 @@ function ChatFallback() {
         <Skeleton className="h-12 w-11/12 rounded-lg" />
       </div>
       <div className="flex min-h-0 flex-1 flex-col" aria-hidden>
-        <div className="border-b border-border p-3">
-          <Skeleton className="h-5 w-40" />
+        <div className="flex items-center gap-3 p-3">
+          <Skeleton className="h-5 w-10" />
+          <Skeleton className="h-5 min-w-0 flex-1" />
+          <Skeleton className="size-8 rounded-md" />
         </div>
         <div className="mx-auto grid w-full max-w-2xl flex-1 content-center gap-3 p-6 sm:grid-cols-3">
           <Skeleton className="h-24 w-full rounded-xl" />
