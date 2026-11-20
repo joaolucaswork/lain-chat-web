@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { ViscoseH1 } from '@/components/ViscoseH1'
 
 /**
  * Páginas públicas (fora do DemoGate/AuthGate): landing + privacidade +
@@ -62,9 +63,7 @@ export function LandingPage() {
   return (
     <PublicShell>
       <section className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-center justify-center px-6 py-16 text-center sm:py-24">
-        <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
-          Memória de longo prazo universal.
-        </h1>
+        <ViscoseH1 />
         <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-muted-foreground sm:text-base">
           A Lain lembra de você entre conversas — no chat, no cofre de memórias
           e em qualquer agente de código via MCP.
