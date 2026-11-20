@@ -448,7 +448,9 @@ export function BrainStage({
       canvas.removeEventListener('webglcontextlost', onLost)
       canvas.parentElement?.removeEventListener('pointermove', onMove)
       canvas.parentElement?.removeEventListener('pointerleave', onLeave)
-      gl.getExtension('WEBGL_lose_context')?.loseContext()
+      // WHY sem loseContext: getContext devolve o MESMO contexto do canvas —
+      // perdê-lo no cleanup (StrictMode remount / HMR) quebra o efeito seguinte
+      // com compiles noop e info-log null. O contexto morre com o canvas.
     }
   }, [failed, progressRef, fixedMorph])
 
