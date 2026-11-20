@@ -52,7 +52,7 @@ function FloatInput({
         autoFocus={autoFocus}
         maxLength={maxLength}
         inputMode={inputMode}
-        className={`peer w-full rounded px-4 pb-2 pt-6 text-[15px] outline-none ${bare ? 'border border-transparent bg-neutral-50 text-neutral-900 focus:border-transparent dark:bg-neutral-800 dark:text-neutral-100' : 'border border-neutral-300 bg-white text-neutral-900 focus:border-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:focus:border-neutral-200'} ${passwordToggle ? 'pr-11' : ''}`}
+        className={`peer w-full rounded px-4 pb-2 pt-6 text-[15px] outline-none ${bare ? 'border border-transparent bg-neutral-100 text-neutral-900 focus:border-transparent dark:bg-neutral-900 dark:text-neutral-100' : 'border border-neutral-300 bg-white text-neutral-900 focus:border-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:focus:border-neutral-200'} ${passwordToggle ? 'pr-11' : ''}`}
       />
       <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[15px] text-neutral-500 transition-all peer-focus:top-1.5 peer-focus:translate-y-0 peer-focus:text-xs peer-focus:text-neutral-700 peer-focus:dark:text-neutral-200 peer-[:not(:placeholder-shown)]:top-1.5 peer-[:not(:placeholder-shown)]:translate-y-0 peer-[:not(:placeholder-shown)]:text-xs dark:text-neutral-400">
         {label}
@@ -439,7 +439,7 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
   const blackBtn =
     'w-full rounded bg-primary px-4 py-3 font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40'
   const ghostBtn =
-    'flex w-full items-center justify-center gap-2 rounded border border-transparent bg-neutral-50 px-4 py-3 font-medium text-neutral-900 disabled:opacity-40 dark:bg-neutral-800 dark:text-neutral-100'
+    'flex w-full items-center justify-center gap-2 rounded border border-transparent bg-neutral-100 px-4 py-3 font-medium text-neutral-900 disabled:opacity-40 dark:bg-neutral-900 dark:text-neutral-100'
 
   // Retorno do OAuth / clique no Google: skeleton da tela principal em vez
   // do formulário de login (flash regressivo). Checking inicial = blank
