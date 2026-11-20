@@ -27,6 +27,7 @@ function FloatInput({
   maxLength,
   inputMode,
   passwordToggle,
+  bare,
 }: {
   value: string
   onChange: (v: string) => void
@@ -37,6 +38,8 @@ function FloatInput({
   maxLength?: number
   inputMode?: 'numeric' | 'text'
   passwordToggle?: { show: boolean; onToggle: () => void }
+  /** Sem borda (fundo suave): usado no campo de e-mail do gate. */
+  bare?: boolean
 }) {
   return (
     <div className="relative">
@@ -49,7 +52,7 @@ function FloatInput({
         autoFocus={autoFocus}
         maxLength={maxLength}
         inputMode={inputMode}
-        className={`peer w-full rounded border border-neutral-300 bg-white px-4 pb-2 pt-6 text-[15px] text-neutral-900 outline-none focus:border-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:focus:border-neutral-200 ${passwordToggle ? 'pr-11' : ''}`}
+        className={`peer w-full rounded px-4 pb-2 pt-6 text-[15px] outline-none ${bare ? 'border border-transparent bg-neutral-100 text-neutral-900 focus:border-transparent dark:bg-neutral-900 dark:text-neutral-100' : 'border border-neutral-300 bg-white text-neutral-900 focus:border-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:focus:border-neutral-200'} ${passwordToggle ? 'pr-11' : ''}`}
       />
       <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[15px] text-neutral-500 transition-all peer-focus:top-1.5 peer-focus:translate-y-0 peer-focus:text-xs peer-focus:text-neutral-700 peer-focus:dark:text-neutral-200 peer-[:not(:placeholder-shown)]:top-1.5 peer-[:not(:placeholder-shown)]:translate-y-0 peer-[:not(:placeholder-shown)]:text-xs dark:text-neutral-400">
         {label}
@@ -468,6 +471,7 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
                   type="email"
                   autoComplete="email"
                   autoFocus
+                  bare
                 />
               </div>
               {error && <p className="text-sm text-rose-600">{error}</p>}
