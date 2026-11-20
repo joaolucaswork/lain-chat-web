@@ -119,14 +119,16 @@ export function GooPanel() {
           const dy = y - mouse.y
           const md = Math.hypot(dx, dy)
           const near = md < MOUSE_R && md > 0.01 ? (MOUSE_R - md) / MOUSE_R : 0
+          const px = x + (dx / (md || 1)) * near * PUSH
+          const py = y + (dy / (md || 1)) * near * PUSH
           // Radial aberto: cor chapada até perto da borda; fade só no
           // cantinho (pra não voltar o bloco).
           const ex = (px - cx) / (w * 0.5)
           const ey = (py - cy) / (h * 0.5)
           const ed = Math.hypot(ex, ey)
-          const m = Math.min(1, Math.max(0, (1 - ed) / 0.15))
-          if (m <= 0.02) continue
-          const a = Math.min(0.8, cell.b * m * (0.55 + near * 0.9))
+          const edge = Math.min(1, Math.max(0, (1 - ed) / 0.15))
+          if (edge <= 0.02) continue
+          const a = Math.min(0.8, cell.b * edge * (0.55 + near * 0.9))
           ctx.fillStyle = `rgba(190, 242, 100, ${a.toFixed(3)})`
           ctx.fillText(cell.ch, px, py)
         }
