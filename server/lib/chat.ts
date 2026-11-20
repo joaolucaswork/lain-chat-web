@@ -68,7 +68,7 @@ export async function processMessage(session: Session, userMessage: string, sign
     return; // sem remember de resposta vazia
   }
   session.messages.push({ role: 'assistant', content: finalText });
-  persistSession(session);
+  await persistSession(session);
   maybeGenerateTitle(session);
   broadcast(stream, 'token_end', { text: streamed ? '' : finalText });
   broadcast(stream, 'done', {});

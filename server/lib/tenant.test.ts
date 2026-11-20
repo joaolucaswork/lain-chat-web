@@ -72,34 +72,34 @@ describe('trava de modelo (T7)', () => {
 });
 
 describe('sessões por dono (T6)', () => {
-  test('mesmo id, donos diferentes = sessões distintas', () => {
-    const a = sessions.getSession('abc', 'owner');
-    const b = sessions.getSession('abc', 'k-0123456789abcdef');
+  test('mesmo id, donos diferentes = sessões distintas', async () => {
+    const a = await sessions.getSession('abc', 'owner');
+    const b = await sessions.getSession('abc', 'k-0123456789abcdef');
     expect(a).not.toBe(b);
     expect(a.owner).toBe('owner');
     expect(b.owner).toBe('k-0123456789abcdef');
   });
 
-  test('findSession nunca retorna sessão alheia', () => {
-    sessions.getSession('segredo', 'owner');
-    expect(sessions.findSession('segredo', 'k-0123456789abcdef')).toBeUndefined();
-    expect(sessions.findSession('segredo', 'owner')?.id).toBe('segredo');
+  test('findSession nunca retorna sessão alheia', async () => {
+    await sessions.getSession('segredo', 'owner');
+    expect(await sessions.findSession('segredo', 'k-0123456789abcdef')).toBeUndefined();
+    expect((await sessions.findSession('segredo', 'owner'))?.id).toBe('segredo');
   });
 
-  test('deleteSession de outro dono não apaga', () => {
-    sessions.getSession('keep', 'owner');
-    expect(sessions.deleteSession('keep', 'k-0123456789abcdef')).toBe(false);
-    expect(sessions.findSession('keep', 'owner')?.id).toBe('keep');
-    expect(sessions.deleteSession('keep', 'owner')).toBe(true);
+  test('deleteSession de outro dono não apaga', async () => {
+    await sessions.getSession('keep', 'owner');
+    expect(await sessions.deleteSession('keep', 'k-0123456789abcdef')).toBe(false);
+    expect((await sessions.findSession('keep', 'owner'))?.id).toBe('keep');
+    expect(await sessions.deleteSession('keep', 'owner')).toBe(true);
   });
 
-  test('persist usa o diretório do dono (limpa o resíduo)', () => {
-    const s = sessions.getSession('dircheck', 'k-aaaaaaaaaaaaaaaa');
+  test('persist usa o diretório do dono (limpa o resíduo)', async () => {
+    const s = await sessions.getSession('dircheck', 'k-aaaaaaaaaaaaaaaa');
     s.messages.push({ role: 'user', content: 'oi' });
-    sessions.persistSession(s);
+    await sessions.persistSession(s);
     expect(existsSync(sessions.sessionFile('dircheck', 'k-aaaaaaaaaaaaaaaa'))).toBe(true);
     expect(existsSync(sessions.sessionFile('dircheck', 'owner'))).toBe(false);
-    sessions.deleteSession('dircheck', 'k-aaaaaaaaaaaaaaaa');
+    await sessions.deleteSession('dircheck', 'k-aaaaaaaaaaaaaaaa');
     // O teste usa o SESSIONS_DIR real do processo: remove o subdir vazio.
     try { rmSync(sessions.sessionDir('k-aaaaaaaaaaaaaaaa'), { recursive: true }); } catch {}
   });

@@ -15,7 +15,7 @@ export async function handleChat(req: Request, path: string, params: URLSearchPa
     const sessionId = params.get('sessionId') || randomUUID();
     // Auto-cria em memória (sem persistir — arquivo só na primeira mensagem).
     // Sem risco entre donos: a sessão nasce no diretório DESTE dono.
-    const existing = getSession(sessionId, owner);
+    const existing = await getSession(sessionId, owner);
     const stream = streamKey(existing);
     let ctrl!: ReadableStreamDefaultController<string>;
     const s = new ReadableStream<string>({
@@ -44,11 +44,11 @@ export async function handleChat(req: Request, path: string, params: URLSearchPa
     const message = ((body.message || '') as string).trim();
     if (!message) return json({ error: 'Message is required' }, 400);
 
-    const session = getSession(sessionId, owner);
+    const session = await getSession(sessionId, owner);
     session.model = effectiveModel(body.model, req);
 
     session.messages.push({ role: 'user', content: message });
-    persistSession(session);
+    await persistSession(session);
     broadcast(streamKey(session), 'user_message', { text: message });
     runTurn(sessionId, session, message, memKey);
 
@@ -62,7 +62,7 @@ export async function handleChat(req: Request, path: string, params: URLSearchPa
   if (req.method === 'POST' && path === '/api/chat/retry') {
     const sessionId = params.get('sessionId');
     if (!sessionId) return json({ error: 'sessionId required' }, 400);
-    const session = findSession(sessionId, owner);
+    const session = await findSession(sessionId, owner);
     if (!session) return json({ error: 'session not found' }, 404);
     const abortKey = sessionKey(owner, sessionId);
     if (abortCtrls.has(abortKey)) return json({ error: 'already processing' }, 409);
@@ -80,7 +80,7 @@ export async function handleChat(req: Request, path: string, params: URLSearchPa
     // assistants; turno falho não tem nada após o user — no-op).
     if (lastUser < session.messages.length - 1) {
       session.messages = session.messages.slice(0, lastUser + 1);
-      persistSession(session);
+      await persistSession(session);
     }
     runTurn(sessionId, session, session.messages[lastUser].content as string, memKey);
     return json({ sessionId, retried: true });
@@ -100,7 +100,7 @@ export async function handleChat(req: Request, path: string, params: URLSearchPa
   if (req.method === 'GET' && path === '/api/history') {
     const sessionId = params.get('sessionId');
     if (!sessionId) return json({ error: 'sessionId required' }, 400);
-    const s = findSession(sessionId, owner);
+    const s = await findSession(sessionId, owner);
     if (!s) return json({ error: 'session not found' }, 404);
     return json({ messages: s.messages });
   }
@@ -112,10 +112,10 @@ export async function handleChat(req: Request, path: string, params: URLSearchPa
   if (req.method === 'POST' && path === '/api/clear') {
     const sessionId = params.get('sessionId');
     if (sessionId) {
-      const s = findSession(sessionId, owner);
+      const s = await findSession(sessionId, owner);
       if (s) {
         s.messages = [s.messages[0]];
-        persistSession(s);
+        await persistSession(s);
       }
     }
     return json({ ok: true });

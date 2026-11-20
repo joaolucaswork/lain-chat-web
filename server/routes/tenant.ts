@@ -151,7 +151,7 @@ export async function handleTenant(req: Request, path: string): Promise<Response
       }
       // Transcripts saem junto (mesmo dono estável) — sem órfãos no disco.
       const { deleteOwnerSessions } = await import('../lib/sessions.ts');
-      const wipedSessions = deleteOwnerSessions(await resolveOwner(req));
+      const wipedSessions = await deleteOwnerSessions(await resolveOwner(req));
       // Perfil (nome) é PII: sai junto na exclusão.
       const { deleteTenantProfile } = await import('../lib/profile.ts');
       deleteTenantProfile(await resolveOwner(req));

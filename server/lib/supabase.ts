@@ -27,6 +27,11 @@ function adminClient(): SupabaseClient {
   return _admin;
 }
 
+/** Client service_role (bypassa RLS): só o BFF usa, nunca o browser. */
+export function supabaseAdmin(): SupabaseClient {
+  return adminClient();
+}
+
 /** Localiza o id do usuário pelo email (login primeiro, cadastro depois). Paginado — suficiente para a base atual. */
 export async function findUserIdByEmail(email: string): Promise<string | null> {
   const target = (email ?? '').trim().toLowerCase();

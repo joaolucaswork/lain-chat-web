@@ -1,6 +1,6 @@
 /** Rotas de sessões: lista, delete e patch (título/favorito). Tudo filtrado por dono. */
 import { unlinkSync } from 'node:fs';
-import { deleteSession, findSession, isEmptySession, isSafeSessionId, persistSession, sessionFile, sessions } from '../lib/sessions.ts';
+import { deleteSession, findSession, isEmptySession, isSafeSessionId, listSessions, persistSession, sessionFile } from '../lib/sessions.ts';
 import { resolveOwner } from '../lib/tenant.ts';
 import { json } from '../lib/http.ts';
 
@@ -10,9 +10,10 @@ export async function handleSessions(req: Request, path: string, params: URLSear
   // Sessões vazias (só system, nenhuma mensagem) ficam de fora — clicar no
   // lápis só abre a caixa vazia, sem criar entrada no histórico.
   if (req.method === 'GET' && path === '/api/sessions') {
-    const list = [...sessions.entries()]
-      .filter(([, s]) => s.owner === owner && !isEmptySession(s))
-      .map(([, s]) => ({
+    const all = await listSessions(owner);
+    const list = all
+      .filter((s) => !isEmptySession(s))
+      .map((s) => ({
       id: s.id, createdAt: s.createdAt, model: s.model,
       messageCount: s.messages.filter(m => m.role !== 'system').length,
       preview: s.messages.find(m => m.role === 'user')?.content?.slice(0, 100) || '',
@@ -32,7 +33,7 @@ export async function handleSessions(req: Request, path: string, params: URLSear
     const sessionId = idFromPath || params.get('sessionId') || '';
     if (!sessionId) return json({ error: 'sessionId required' }, 400);
     if (!isSafeSessionId(sessionId)) return json({ error: 'invalid sessionId' }, 400);
-    const existed = deleteSession(sessionId, owner);
+    const existed = await deleteSession(sessionId, owner);
     if (!existed) {
       // Arquivo pode ter sido removido mas id inválido em memória — tenta remover arquivo mesmo assim
       try { unlinkSync(sessionFile(sessionId, owner)); } catch { /* ignore */ }
@@ -46,7 +47,7 @@ export async function handleSessions(req: Request, path: string, params: URLSear
   if (req.method === 'PATCH' && path.startsWith('/api/sessions/')) {
     const sessionId = decodeURIComponent(path.slice('/api/sessions/'.length));
     if (!isSafeSessionId(sessionId)) return json({ error: 'invalid sessionId' }, 400);
-    const s = findSession(sessionId, owner);
+    const s = await findSession(sessionId, owner);
     if (!s) return json({ error: 'session not found' }, 404);
     let body: any = {};
     try { body = await req.json(); } catch { return json({ error: 'Invalid JSON' }, 400); }
@@ -64,7 +65,7 @@ export async function handleSessions(req: Request, path: string, params: URLSear
         delete s.favoritedAt;
       }
     }
-    persistSession(s);
+    await persistSession(s);
     return json({
       ok: true,
       session: {

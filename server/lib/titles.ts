@@ -68,10 +68,10 @@ export function maybeGenerateTitle(session: Session): void {
         console.error(`[bff] title gen empty (${session.id.slice(0, 8)}) após retry`);
         return;
       }
-      const current = findSession(session.id, session.owner);
+      const current = await findSession(session.id, session.owner);
       if (!current || current.title) return;
       current.title = title;
-      persistSession(current);
+      await persistSession(current);
     } catch (err) {
       console.error(`[bff] title gen failed (${session.id.slice(0, 8)}):`, err instanceof Error ? err.message : err);
     } finally {

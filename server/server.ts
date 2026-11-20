@@ -12,7 +12,7 @@
  *   config.ts        env + constantes (ver server/.env.example)
  *   lib/http.ts      headers de segurança, json(), sseMsg()
  *   lib/sse.ts       clientes SSE por sessão + broadcast()
- *   lib/sessions.ts  store em memória + persistência em disco
+ *   lib/sessions.ts  memória (L1) + Supabase (fonte única) ou disco (fallback)
  *   lib/memory.ts    recall/grafo/remember/vault (best-effort)
  *   lib/llm.ts       streaming OpenAI-compatible + tools
  *   lib/titles.ts    títulos de sessão via LLM
@@ -25,6 +25,7 @@
 import { BIND_ADDR, LLM_BASE, MEMORY_KEY, MEMORY_URL, PORT } from './config.ts';
 import { json } from './lib/http.ts';
 import { loadSessionsFromDisk, sessions } from './lib/sessions.ts';
+import { isSessionDbConfigured } from './lib/session-store.ts';
 import { maybeGenerateTitle } from './lib/titles.ts';
 import { handleStatic } from './routes/static.ts';
 import { handleChat } from './routes/chat.ts';
@@ -35,23 +36,29 @@ import { handleTenant } from './routes/tenant.ts';
 import { handleAuth } from './routes/auth.ts';
 import { isSupabaseConfigured } from './lib/supabase.ts';
 
-loadSessionsFromDisk();
-
 if (!MEMORY_KEY) {
   console.error('[lain-chat-bff] fatal: LAIN_MEMORY_API_KEY is required');
   process.exit(1);
 }
 
-// Backfill: sessões antigas (criadas antes do título) ganham título
-// na subida do BFF, sem bloquear o boot. Sequencial com intervalo
-// para não tomar rate limit do provider (17 paralelas falham).
-let _titleBackfillDelay = 0;
-for (const s of sessions.values()) {
-  if (!s.title) {
-    const delay = _titleBackfillDelay;
-    _titleBackfillDelay += 1500;
-    setTimeout(() => maybeGenerateTitle(s), delay);
+if (!isSessionDbConfigured()) {
+  loadSessionsFromDisk();
+
+  // Backfill: sessões antigas (criadas antes do título) ganham título
+  // na subida do BFF, sem bloquear o boot. Sequencial com intervalo
+  // para não tomar rate limit do provider (17 paralelas falham).
+  let _titleBackfillDelay = 0;
+  for (const s of sessions.values()) {
+    if (!s.title) {
+      const delay = _titleBackfillDelay;
+      _titleBackfillDelay += 1500;
+      setTimeout(() => maybeGenerateTitle(s), delay);
+    }
   }
+} else {
+  // Com DB: sessões vêm do Supabase por demanda (read-through) — sem
+  // warmup, sem backfill no boot (títulos geram no próximo turno).
+  console.log('[bff] sessions: Supabase (sync localhost↔VPS)');
 }
 
 const server = Bun.serve({

@@ -1,17 +1,18 @@
 /**
- * Sessões do chat: estado em memória + persistência em disco.
- * Um JSON por sessão em SESSIONS_DIR (owner) ou SESSIONS_DIR/<owner>/ (visitantes).
+ * Sessões do chat: memória (L1) + Supabase (`chat_sessions`) quando configurado,
+ * disco (`SESSIONS_DIR`) como fallback (dev sem secret, testes).
+ * A tabela é a fonte única — localhost e VPS leem o mesmo lugar, por isso
+ * as conversas sincronizam. Upsert é last-write-wins por (owner, id).
  * O dono (`owner`) é o hash da tenant key (`k-<sha256>`) ou 'owner' (modo legado).
  * Isolamento: getSession/findSession/deleteSession sempre recebem o owner —
- * um visitante nunca abre a sessão de outro (404) nem lista (filtro por dir).
- * Escrita síncrona (arquivos pequenos, baixo volume) para não perder
- * a mensagem do usuário se o processo cair no meio do stream.
+ * um visitante nunca abre a sessão de outro (404) nem lista (filtro por dono).
  */
 import { readFileSync, mkdirSync, readdirSync, writeFileSync, unlinkSync, chmodSync, renameSync } from 'node:fs';
 import { join, basename } from 'node:path';
 import { DEFAULT_MODEL, SESSIONS_DIR, SYSTEM_PROMPT } from '../config.ts';
 import { dropSessionClients } from './sse.ts';
 import { OWNER } from './tenant.ts';
+import { dbDeleteOwnerSessions, dbDeleteSession, dbFetchSession, dbListSessions, dbUpsertSession, isSessionDbConfigured } from './session-store.ts';
 
 export interface ChatMsg {
   role: 'system' | 'user' | 'assistant';
@@ -62,7 +63,7 @@ export function sessionFile(id: string, owner: string = OWNER): string {
   return join(sessionDir(owner), `${basename(id)}.json`);
 }
 
-export function persistSession(s: Session): void {
+export function persistSessionDisk(s: Session): void {
   if (!isSafeSessionId(s.id) || !isSafeOwner(s.owner)) return;
   try {
     const dir = sessionDir(s.owner);
@@ -77,6 +78,21 @@ export function persistSession(s: Session): void {
   } catch (err) {
     console.error('[bff] persist session failed:', err instanceof Error ? err.message : err);
   }
+}
+
+/** Write-through: memória + Supabase (quando configurado) ou disco. Nunca throw. */
+export async function persistSession(s: Session): Promise<void> {
+  if (!isSafeSessionId(s.id) || !isSafeOwner(s.owner)) return;
+  sessions.set(sessionKey(s.owner, s.id), s);
+  if (isSessionDbConfigured()) {
+    try {
+      await dbUpsertSession(s);
+    } catch (err) {
+      console.error('[bff] session db upsert failed:', err instanceof Error ? err.message : err);
+    }
+    return;
+  }
+  persistSessionDisk(s);
 }
 
 function readSessionFile(dir: string, f: string, owner: string): void {
@@ -148,6 +164,19 @@ export function loadSessionsFromDisk(): void {
   if (loaded > 0) console.log(`[bff] loaded ${loaded} session(s) from ${SESSIONS_DIR}${purged ? ` (purged ${purged} empty)` : ''}`);
 }
 
+/** Lê do disco sem tocar no Map (fallback quando o DB não está configurado). */
+function readDiskSession(id: string, owner: string): Session | undefined {
+  if (!isSafeSessionId(id) || !isSafeOwner(owner)) return undefined;
+  try {
+    const raw = readFileSync(sessionFile(id, owner), 'utf-8');
+    const parsed = JSON.parse(raw) as Session;
+    if (!parsed || parsed.id !== id || !Array.isArray(parsed.messages)) return undefined;
+    return { ...parsed, owner };
+  } catch {
+    return undefined;
+  }
+}
+
 function blankSession(id: string, owner: string): Session {
   return {
     id,
@@ -162,35 +191,74 @@ function blankSession(id: string, owner: string): Session {
 }
 
 /** Abre (ou cria) a sessão DESTE dono. Nunca retorna sessão alheia. */
-export function getSession(id: string, owner: string = OWNER): Session {
+export async function getSession(id: string, owner: string = OWNER): Promise<Session> {
   const key = sessionKey(owner, id);
-  let s = sessions.get(key);
-  if (!s) {
-    s = blankSession(id, owner);
-    sessions.set(key, s);
-    // Sessão nova só é persistida na primeira mensagem (POST /api/chat).
-    // Persistir aqui criava entradas "New conversation" vazias no histórico
-    // só de abrir o app ou clicar no lápis (o SSE/history chamam o get).
+  const hit = sessions.get(key);
+  if (hit) return hit;
+  if (isSessionDbConfigured()) {
+    try {
+      const s = await dbFetchSession(owner, id);
+      if (s) {
+        sessions.set(key, s);
+        return s;
+      }
+    } catch (err) {
+      console.error('[bff] session db fetch failed:', err instanceof Error ? err.message : err);
+    }
+  } else {
+    const disk = readDiskSession(id, owner);
+    if (disk) {
+      sessions.set(key, disk);
+      return disk;
+    }
   }
-  return s;
+  const blank = blankSession(id, owner);
+  sessions.set(key, blank);
+  // Sessão nova só é persistida na primeira mensagem (POST /api/chat).
+  // Persistir aqui criava entradas "New conversation" vazias no histórico
+  // só de abrir o app ou clicar no lápis (o SSE/history chamam o get).
+  return blank;
 }
 
 /** Busca sem criar (SSE/history/retry/patch): null = 404, nunca alheia. */
-export function findSession(id: string, owner: string = OWNER): Session | undefined {
+export async function findSession(id: string, owner: string = OWNER): Promise<Session | undefined> {
   const key = sessionKey(owner, id);
   const s = sessions.get(key);
   if (s) return s;
-  // Recarrega do disco do PRÓPRIO dono (restart perdeu o mapa).
-  try {
-    const raw = readFileSync(sessionFile(id, owner), 'utf-8');
-    const parsed = JSON.parse(raw) as Session;
-    if (!parsed || parsed.id !== id || !Array.isArray(parsed.messages)) return undefined;
-    const full: Session = { ...parsed, owner };
-    sessions.set(key, full);
-    return full;
-  } catch {
+  if (isSessionDbConfigured()) {
+    try {
+      const row = await dbFetchSession(owner, id);
+      if (row) {
+        sessions.set(key, row);
+        return row;
+      }
+    } catch (err) {
+      console.error('[bff] session db fetch failed:', err instanceof Error ? err.message : err);
+    }
     return undefined;
   }
+  // Recarrega do disco do PRÓPRIO dono (restart perdeu o mapa).
+  const disk = readDiskSession(id, owner);
+  if (disk) sessions.set(key, disk);
+  return disk;
+}
+
+/** Lista as sessões NÃO vazias deste dono, mais recentes primeiro. */
+export async function listSessions(owner: string = OWNER): Promise<Session[]> {
+  if (isSessionDbConfigured()) {
+    try {
+      const rows = await dbListSessions(owner);
+      const out = rows.filter((s) => !isEmptySession(s));
+      for (const s of out) sessions.set(sessionKey(owner, s.id), s);
+      return out.sort((a, b) => b.createdAt - a.createdAt);
+    } catch (err) {
+      console.error('[bff] session db list failed:', err instanceof Error ? err.message : err);
+      return [...sessions.values()].filter((s) => s.owner === owner && !isEmptySession(s))
+        .sort((a, b) => b.createdAt - a.createdAt);
+    }
+  }
+  return [...sessions.values()].filter((s) => s.owner === owner && !isEmptySession(s))
+    .sort((a, b) => b.createdAt - a.createdAt);
 }
 
 /** Sessão sem nenhuma mensagem de usuário/assistente — não aparece na lista. */
@@ -199,8 +267,24 @@ export function isEmptySession(s: Session): boolean {
 }
 
 /** Apaga TODAS as sessões de um dono (wipe LGPD: transcripts saem junto). */
-export function deleteOwnerSessions(owner: string): number {
+export async function deleteOwnerSessions(owner: string): Promise<number> {
   if (!isSafeOwner(owner)) return 0;
+  if (isSessionDbConfigured()) {
+    for (const [key, s] of sessions) {
+      if (s.owner !== owner) continue;
+      sessions.delete(key);
+      const stream = sessionKey(owner, s.id);
+      abortCtrls.get(stream)?.abort();
+      abortCtrls.delete(stream);
+      dropSessionClients(stream);
+    }
+    try {
+      return await dbDeleteOwnerSessions(owner);
+    } catch (err) {
+      console.error('[bff] session db wipe failed:', err instanceof Error ? err.message : err);
+      return 0;
+    }
+  }
   let n = 0;
   for (const [key, s] of sessions) {
     if (s.owner !== owner) continue;
@@ -215,13 +299,23 @@ export function deleteOwnerSessions(owner: string): number {
   return n;
 }
 
-export function deleteSession(id: string, owner: string = OWNER): boolean {
+export async function deleteSession(id: string, owner: string = OWNER): Promise<boolean> {
   if (!isSafeSessionId(id) || !isSafeOwner(owner)) return false;
   const existed = sessions.delete(sessionKey(owner, id));
   const stream = sessionKey(owner, id);
   abortCtrls.get(stream)?.abort();
   abortCtrls.delete(stream);
   dropSessionClients(stream);
+  if (isSessionDbConfigured()) {
+    try {
+      // Outro BFF pode ter a sessão em memória: o delete no DB vale mesmo
+      // com cache local frio (conversa apagada no celular some no desktop).
+      return (await dbDeleteSession(owner, id)) || existed;
+    } catch (err) {
+      console.error('[bff] session db delete failed:', err instanceof Error ? err.message : err);
+      return existed;
+    }
+  }
   try { unlinkSync(sessionFile(id, owner)); } catch { /* arquivo pode não existir */ }
   return existed;
 }
