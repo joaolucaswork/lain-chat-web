@@ -5,7 +5,6 @@ import {
   InputGroupButton,
   InputGroupTextarea,
 } from '@/components/ui/input-group'
-import { Spinner } from '@/components/ui/spinner'
 import { ArrowUp, Square } from '@phosphor-icons/react'
 
 interface ChatInputProps {
@@ -22,8 +21,10 @@ export function ChatInput({ onSend, onStop, disabled, placeholder = 'Envie uma m
 
   useEffect(() => {
     // WHY mobile: não puxa o foco (e o teclado) automaticamente no touch.
+    // WHY generating: o input fica livre para digitar durante a geração,
+    // então o foco não depende mais do `disabled` — só refoca no desktop.
     if (!window.matchMedia('(pointer: fine)').matches) return
-    if (!disabled) textareaRef.current?.focus()
+    textareaRef.current?.focus()
   }, [disabled])
 
   useEffect(() => {
@@ -46,6 +47,8 @@ export function ChatInput({ onSend, onStop, disabled, placeholder = 'Envie uma m
   }, [])
 
   const handleSend = () => {
+    // WHY: `disabled` aqui significa "gerando" — o texto é preservado como
+    // rascunho para enviar após parar/terminar, o textarea segue editável.
     if (!text.trim() || disabled) return
     onSend(text.trim())
     setText('')
@@ -67,7 +70,6 @@ export function ChatInput({ onSend, onStop, disabled, placeholder = 'Envie uma m
               }
             }}
             placeholder={placeholder}
-            disabled={disabled}
             rows={1}
             enterKeyHint="send"
             className="max-h-[200px] min-h-[40px] min-w-0 text-[16px] leading-[1.6] tracking-[0.01em] sm:leading-[1.7]"
@@ -77,8 +79,8 @@ export function ChatInput({ onSend, onStop, disabled, placeholder = 'Envie uma m
             {disabled && onStop ? (
               <InputGroupButton
                 size="icon-sm"
-                variant="destructive"
-                className="cursor-pointer"
+                variant="default"
+                className="cursor-pointer rounded-full"
                 onClick={onStop}
                 title="Parar de gerar"
                 aria-label="Parar de gerar"
@@ -91,11 +93,11 @@ export function ChatInput({ onSend, onStop, disabled, placeholder = 'Envie uma m
                 variant="secondary"
                 className="cursor-pointer rounded-full bg-background shadow-sm disabled:cursor-default disabled:opacity-30 disabled:shadow-none dark:bg-secondary dark:shadow-none"
                 onClick={handleSend}
-                disabled={disabled || !text.trim()}
+                disabled={!text.trim()}
                 title="Enviar"
                 aria-label="Enviar"
               >
-                {disabled ? <Spinner /> : <ArrowUp weight="bold" />}
+                <ArrowUp weight="bold" />
               </InputGroupButton>
             )}
           </InputGroupAddon>
