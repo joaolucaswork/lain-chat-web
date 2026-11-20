@@ -8,7 +8,7 @@ import { useEffect, useRef } from 'react'
  */
 
 const BLOBS = 7
-const COLORS = ['#3f6212', '#65a30d', '#84cc16']
+const COLORS = ['#4d7c0f', '#65a30d', '#84cc16']
 
 type Blob = { bx: number; by: number; r: number; sp: number; ph: number }
 
@@ -27,7 +27,7 @@ export function GooPanel() {
     const mouse = { x: -9999, y: -9999 }
     const blobs: Blob[] = Array.from({ length: BLOBS }, (_, i) => ({
       bx: 0.2 + 0.6 * ((i * 0.37) % 1),
-      by: 0.2 + 0.6 * ((i * 0.53) % 1),
+      by: 0.28 + 0.5 * ((i * 0.53) % 1),
       r: 0.09 + 0.05 * ((i * 0.29) % 1),
       sp: 0.00035 + 0.0002 * ((i * 0.41) % 1),
       ph: i * 1.7,
