@@ -28,6 +28,8 @@ export function GooPanel() {
     let h = 0
     const dpr = Math.min(window.devicePixelRatio || 1, 2)
     const mouse = { x: -9999, y: -9999 }
+    // Cursor suavizado (lag do Viscose): o repel persegue, não pula.
+    const sm = { x: -9999, y: -9999 }
     const blobs: Blob[] = Array.from({ length: BLOBS }, (_, i) => ({
       bx: 0.2 + 0.6 * ((i * 0.37) % 1),
       by: 0.28 + 0.5 * ((i * 0.53) % 1),
@@ -84,12 +86,26 @@ export function GooPanel() {
       const cy = h / 2
       ctx.clearRect(0, 0, w, h)
 
+      // Persegue o mouse (0.14/frame); fora do painel, relaxa de volta.
+      if (mouse.x < -9000) {
+        sm.x = -9999
+        sm.y = -9999
+      } else {
+        if (sm.x < -9000) {
+          sm.x = mouse.x
+          sm.y = mouse.y
+        } else {
+          sm.x += (mouse.x - sm.x) * 0.14
+          sm.y += (mouse.y - sm.y) * 0.14
+        }
+      }
+
       // Blobs invisíveis: só posições à deriva (foge do mouse).
       for (const b of blobs) {
         const x = b.bx * w + Math.sin(t * b.sp + b.ph) * w * 0.08
         const y = b.by * h + Math.cos(t * b.sp * 1.3 + b.ph) * h * 0.08
-        const dx = x - mouse.x
-        const dy = y - mouse.y
+        const dx = x - sm.x
+        const dy = y - sm.y
         const d = Math.hypot(dx, dy)
         const push = d < 160 && d > 0.01 ? ((160 - d) / 160) * 46 : 0
         b.x = x + (dx / (d || 1)) * push
@@ -115,8 +131,8 @@ export function GooPanel() {
             f += Math.exp(-dd / (2 * br * br))
           }
           if (f < 0.15) continue
-          const dx = x - mouse.x
-          const dy = y - mouse.y
+          const dx = x - sm.x
+          const dy = y - sm.y
           const md = Math.hypot(dx, dy)
           const near = md < MOUSE_R && md > 0.01 ? (MOUSE_R - md) / MOUSE_R : 0
           const px = x + (dx / (md || 1)) * near * PUSH
