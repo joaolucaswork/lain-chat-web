@@ -439,7 +439,7 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
   const blackBtn =
     'w-full rounded bg-primary px-4 py-3 font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40'
   const ghostBtn =
-    'flex w-full items-center justify-center gap-2 rounded border border-neutral-300 bg-white px-4 py-3 font-medium text-neutral-900 disabled:opacity-40 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100'
+    'flex w-full items-center justify-center gap-2 rounded border border-transparent bg-neutral-100 px-4 py-3 font-medium text-neutral-900 disabled:opacity-40 dark:bg-neutral-900 dark:text-neutral-100'
 
   // Retorno do OAuth / clique no Google: skeleton da tela principal em vez
   // do formulário de login (flash regressivo). Checking inicial = blank
@@ -463,6 +463,11 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
                 <GoogleLogo />
                 Continuar com Google
               </button>
+              <div className="flex items-center gap-3" aria-hidden>
+                <span className="h-px flex-1 bg-neutral-200 dark:bg-neutral-800" />
+                <span className="text-xs text-neutral-500 dark:text-neutral-400">ou</span>
+                <span className="h-px flex-1 bg-neutral-200 dark:bg-neutral-800" />
+              </div>
               <div className="text-left">
                 <FloatInput
                   value={email}
