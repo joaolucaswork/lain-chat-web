@@ -84,9 +84,10 @@ export async function processMessage(session: Session, userMessage: string, sign
   const history = session.messages.filter(m => m.role !== 'system').slice(-20);
   const today = getSaoPauloToday();
   const who = personContext(profileName);
-  const baseSystem = (typeof session.messages[0]?.content === 'string' && session.messages[0].content
-    ? session.messages[0].content
-    : SYSTEM_PROMPT) as string;
+  // SYSTEM_PROMPT global: sessões antigas têm o prompt velho gravado em
+  // messages[0] (sem parcimônia/[USER PROFILE] e sem <turn_context>) — usar o
+  // atual direto faz a melhoria valer também para conversas já abertas.
+  const baseSystem = SYSTEM_PROMPT;
   const apiMessages: Array<Record<string, unknown>> = buildApiMessages({
     baseSystem,
     who,
