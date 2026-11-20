@@ -1,7 +1,6 @@
 import { useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { GooPanel } from '@/components/GooPanel'
-import { ViscoseH1 } from '@/components/ViscoseH1'
 import { McpTabs } from '@/components/landing/McpTabs'
 import { BrainStage } from '@/components/landing/BrainStage'
 import { useLandingProgress, type LandingProgress } from '@/components/landing/useLandingProgress'
@@ -79,7 +78,9 @@ function HeroCopy() {
         MEMÓRIA DE LONGO PRAZO
       </p>
       <div className="mt-5">
-        <ViscoseH1 />
+        <h1 className="font-display text-4xl font-medium tracking-[-0.03em] text-balance sm:text-5xl sm:leading-[1.02]">
+          Sua memória, em qualquer agente.
+        </h1>
       </div>
       <p className="mt-4 max-w-md text-[15px] leading-relaxed text-muted-foreground sm:text-base">
         A Lain lembra de você entre conversas — no chat, no cofre de memórias
