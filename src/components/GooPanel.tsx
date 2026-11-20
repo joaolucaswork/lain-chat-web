@@ -111,12 +111,12 @@ export function GooPanel() {
           const y = r * CELL - CELL + yOff
           let f = 0
           for (const b of blobs) {
-            const br = b.r * m
+            const br = b.r * m * 0.7
             const dd = (x - b.x) * (x - b.x) + (y - b.y) * (y - b.y)
             f += Math.exp(-dd / (2 * br * br))
           }
-          if (f < 0.25) continue
-          ltx.fillStyle = `rgba(190, 242, 100, ${Math.min(0.9, f * 0.55).toFixed(3)})`
+          if (f < 0.5) continue
+          ltx.fillStyle = `rgba(190, 242, 100, ${Math.min(0.55, f * 0.35).toFixed(3)})`
           ltx.fillText(chars[i], x, y)
         }
       }
