@@ -118,8 +118,6 @@ export function GooPanel() {
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="lain-sweep absolute inset-x-0 h-28" />
       </div>
-      {/* vinheta p/ afundar as bordas no preto */}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_55%,rgba(0,0,0,0.55)_100%)]" />
     </div>
   )
 }

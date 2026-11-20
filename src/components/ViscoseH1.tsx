@@ -62,7 +62,26 @@ export function ViscoseH1() {
     let timer = 0
     let alive = true
 
+    /** Estado limpo: só a frase atual visível, sem threshold. */
+    const settle = (n: number) => {
+      cancelAnimationFrame(raf)
+      clearTimeout(timer)
+      layersRef.current.forEach((el, i) => paint(el, i === n ? 1 : 0))
+      goo.style.filter = 'none'
+      cur = n
+      setSpoken(PHRASES[n])
+    }
+
+    const schedule = () => {
+      clearTimeout(timer)
+      timer = window.setTimeout(() => morphTo((cur + 1) % PHRASES.length), HOLD_MS)
+    }
+
     const morphTo = (next: number) => {
+      // Mata qualquer morph anterior: sem isso, voltar de aba oculta (rAF
+      // pausado, timer correndo) empilha loops e trava duas frases visíveis.
+      cancelAnimationFrame(raf)
+      clearTimeout(timer)
       const out = layersRef.current[cur]
       const into = layersRef.current[next]
       const t0 = performance.now()
@@ -78,18 +97,29 @@ export function ViscoseH1() {
           goo.style.filter = 'none'
           cur = next
           setSpoken(PHRASES[cur])
-          timer = window.setTimeout(() => morphTo((cur + 1) % PHRASES.length), HOLD_MS)
+          schedule()
         }
       }
       raf = requestAnimationFrame(frame)
     }
 
-    timer = window.setTimeout(() => morphTo(1), HOLD_MS)
+    const onVis = () => {
+      if (!alive) return
+      if (document.hidden) {
+        cancelAnimationFrame(raf)
+        clearTimeout(timer)
+      } else {
+        settle(cur)
+        schedule()
+      }
+    }
+    document.addEventListener('visibilitychange', onVis)
+
+    schedule()
     return () => {
       alive = false
-      cancelAnimationFrame(raf)
-      clearTimeout(timer)
-      goo.style.filter = 'none'
+      document.removeEventListener('visibilitychange', onVis)
+      settle(cur)
     }
   }, [])
 
