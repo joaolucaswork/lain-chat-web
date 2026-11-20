@@ -103,10 +103,11 @@ void main() {
   vec2 radial = aHomePos - uCenter;
   vec2 tang = vec2(-radial.y, radial.x) / (length(radial) + 1e-3);
   vec2 pos = mix(homeW, bScreen, e) + tang * sin(e * 3.14159) * (uBrainScale * 0.12) * (0.4 + 0.6 * seed);
-  // Troca esporádica de glifos no shader: zero atualização de buffers.
-  float q = floor(uTime * 8.0 + seed * 7.0);
+  // Troca calma de glifos no shader (zero atualização de buffers):
+  // ~0.25 trocas/s por partícula, fases espalhadas p/ não pulsar em bloco.
+  float q = floor(uTime * 4.0 + seed * 11.0);
   float g = glyph;
-  if (h21(vec2(seed * 91.7, q * 13.3)) < 0.12) {
+  if (h21(vec2(seed * 91.7, q * 13.3)) < 0.06) {
     g = floor(h21(vec2(seed * 47.3, q * 7.7)) * 31.0);
   }
   vUv = (aUV + vec2(mod(g, 8.0), floor(g / 8.0))) / 8.0;
