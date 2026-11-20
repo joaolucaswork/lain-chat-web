@@ -85,8 +85,8 @@
   background: linear-gradient(
     to bottom,
     transparent,
-    rgba(132, 204, 22, 0.09) 70%,
-    rgba(132, 204, 22, 0.16) 100%
+    rgba(132, 204, 22, 0.05) 70%,
+    rgba(132, 204, 22, 0.09) 100%
   );
   animation: lain-sweep 9s linear infinite;
 }
