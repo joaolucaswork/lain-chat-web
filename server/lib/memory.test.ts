@@ -1,11 +1,64 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, test, afterEach } from 'bun:test';
 import {
   buildMemoryBlock,
+  fetchJson,
   getSaoPauloToday,
   memDate,
   shouldQueryGraph,
   stripQuestionFraming,
 } from './memory.ts';
+
+const _origFetch = globalThis.fetch;
+afterEach(() => {
+  globalThis.fetch = _origFetch;
+});
+
+function mockFetchOnce(responses: Response[]): { calls: number } {
+  const state = { calls: 0 };
+  globalThis.fetch = (async () => {
+    const r = responses[Math.min(state.calls, responses.length - 1)];
+    state.calls++;
+    return r;
+  }) as typeof fetch;
+  return state;
+}
+
+const okJson = (data: unknown) => new Response(JSON.stringify(data), { status: 200 });
+const errText = (status: number, body: string) => new Response(body, { status });
+
+describe('fetchJson retry', () => {
+  test('429 rate-limit repete e devolve o JSON da tentativa boa', async () => {
+    const state = mockFetchOnce([
+      errText(429, JSON.stringify({ error: 'tenant rate limit exceeded (60 req/min)' })),
+      okJson({ ok: true }),
+    ]);
+    const out = await fetchJson('https://x/api/memory/recall', {}, 5000, undefined, 3);
+    expect(out).toEqual({ ok: true });
+    expect(state.calls).toBe(2);
+  });
+
+  test('429 de cota (memory cap) NÃO repete — chamada única', async () => {
+    const state = mockFetchOnce([errText(429, JSON.stringify({ error: 'memory cap reached (500 per scope)' }))]);
+    await expect(fetchJson('https://x/api/memory/remember', {}, 5000, undefined, 3)).rejects.toThrow('→ 429');
+    expect(state.calls).toBe(1);
+  });
+
+  test('500 não repete (pode ser pós-escrita)', async () => {
+    const state = mockFetchOnce([errText(500, 'boom')]);
+    await expect(fetchJson('https://x/api/memory/recall', {}, 5000, undefined, 3)).rejects.toThrow('→ 500');
+    expect(state.calls).toBe(1);
+  });
+
+  test('timeout de rede não repete (remember pode ter salvo)', async () => {
+    let calls = 0;
+    globalThis.fetch = (async () => {
+      calls++;
+      throw new Error('signal timed out');
+    }) as typeof fetch;
+    await expect(fetchJson('https://x/api/memory/remember', {}, 50, undefined, 3)).rejects.toThrow('timed out');
+    expect(calls).toBe(1);
+  });
+});
 
 describe('stripQuestionFraming', () => {
   test('remove framing interrogativo mantendo a keyword', () => {

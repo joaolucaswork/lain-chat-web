@@ -26,18 +26,49 @@ export function memGetHeaders(key?: string): Record<string, string> {
   return { ...(k ? { Authorization: `Bearer ${k}` } : {}) };
 }
 
-export async function fetchJson(url: string, body: unknown, timeoutMs = 5000, key?: string): Promise<any> {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...memGetHeaders(key),
-    },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(timeoutMs),
-  });
-  if (!res.ok) throw new Error(`${url} → ${res.status}`);
-  return res.json();
+/** 429 do gate de rate limit (60 req/min/tenant) sai ANTES do handler da VPS —
+ *  sem efeito colateral, seguro repetir. 429 de cota ("memory cap reached")
+ *  já passou do gate: repetir não adianta. 502/503/504 = proxy, pré-handler. */
+function isRetryableStatus(status: number, body: string): boolean {
+  if (status === 429) return /rate limit/i.test(body);
+  return status === 502 || status === 503 || status === 504;
+}
+
+const FETCH_RETRY_ATTEMPTS = 3;
+const FETCH_RETRY_BASE_MS = 400;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+export async function fetchJson(url: string, body: unknown, timeoutMs = 5000, key?: string, attempts = FETCH_RETRY_ATTEMPTS): Promise<any> {
+  let lastErr: unknown = null;
+  for (let i = 0; i < attempts; i++) {
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...memGetHeaders(key),
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (err) {
+      // Timeout/abort/rede: sem retry — um remember pode ter salvo no servidor
+      // e só a resposta se perdeu; repetir criaria duplicata.
+      throw err;
+    }
+    if (res.ok) return res.json();
+    const errBody = await res.text().catch(() => '');
+    lastErr = new Error(`${url} → ${res.status}${errBody ? `: ${errBody.slice(0, 120)}` : ''}`);
+    if (!isRetryableStatus(res.status, errBody) || i === attempts - 1) throw lastErr;
+    const waitMs = FETCH_RETRY_BASE_MS * 2 ** i;
+    console.warn(`[bff] memory retry ${res.status} (tentativa ${i + 1}/${attempts}) em ${waitMs}ms: ${url}`);
+    await sleep(waitMs);
+  }
+  throw lastErr;
 }
 
 /** Tira framing interrogativo PT para o recall não enterrar keywords.
