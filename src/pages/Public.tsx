@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { GooPanel } from '@/components/GooPanel'
 import { ViscoseH1 } from '@/components/ViscoseH1'
 
 /**
@@ -44,52 +45,37 @@ function PublicShell({ children }: { children: React.ReactNode }) {
   )
 }
 
-const FEATURES = [
-  {
-    title: 'Leve sua memória pra qualquer agente',
-    desc: 'Conecte o lain-memory via MCP no Claude Code, OpenCode ou Cursor — recall, remember e grafo com os mesmos fatos das conversas.',
-  },
-  {
-    title: 'Fale normal, ela guarda o essencial',
-    desc: 'A Lain percebe o que importa no que você diz e guarda sozinha. É só conversar, ela lembra por você.',
-  },
-  {
-    title: 'Respostas que lembram de você',
-    desc: 'Antes de responder, ela busca memórias e conexões no grafo — sem você repetir tudo.',
-  },
-]
-
 export function LandingPage() {
   return (
     <PublicShell>
-      <section className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-center justify-center px-6 py-16 text-center sm:py-24">
-        <ViscoseH1 />
-        <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-muted-foreground sm:text-base">
-          A Lain lembra de você entre conversas — no chat, no cofre de memórias
-          e em qualquer agente de código via MCP.
-        </p>
-        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-          <Link
-            to="/"
-            className="rounded-lg bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Entrar ou criar conta
-          </Link>
-          <a
-            href="mailto:jlucaswrk@gmail.com?subject=Lain"
-            className="rounded-lg border border-border px-6 py-3 text-sm font-medium text-foreground transition-colors hover:bg-accent"
-          >
-            Falar com a gente
-          </a>
+      <section className="mx-auto grid w-full max-w-6xl flex-1 items-center gap-10 px-6 py-12 sm:py-16 lg:grid-cols-2 lg:gap-6 lg:py-0">
+        <div className="text-left">
+          <p className="inline-block rounded-full border border-border px-3 py-1 font-mono text-[11px] tracking-[0.18em] text-muted-foreground">
+            MEMÓRIA DE LONGO PRAZO
+          </p>
+          <div className="mt-5">
+            <ViscoseH1 />
+          </div>
+          <p className="mt-4 max-w-md text-[15px] leading-relaxed text-muted-foreground sm:text-base">
+            A Lain lembra de você entre conversas — no chat, no cofre de memórias
+            e em qualquer agente de código via MCP.
+          </p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <Link
+              to="/"
+              className="rounded-full bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            >
+              Entrar ou criar conta
+            </Link>
+            <a
+              href="mailto:jlucaswrk@gmail.com?subject=Lain"
+              className="rounded-full border border-border px-6 py-3 text-center text-sm font-medium text-foreground transition-colors hover:bg-accent"
+            >
+              Falar com a gente
+            </a>
+          </div>
         </div>
-        <div className="mt-16 grid w-full grid-cols-1 gap-3 text-left sm:grid-cols-3">
-          {FEATURES.map((f) => (
-            <div key={f.title} className="rounded-xl border border-border bg-card p-5">
-              <h2 className="text-[15px] font-bold">{f.title}</h2>
-              <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">{f.desc}</p>
-            </div>
-          ))}
-        </div>
+        <GooPanel />
       </section>
     </PublicShell>
   )
