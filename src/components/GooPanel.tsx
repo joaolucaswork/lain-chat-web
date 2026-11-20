@@ -114,7 +114,7 @@ export function GooPanel() {
             const dd = (x - b.x) * (x - b.x) + (y - b.y) * (y - b.y)
             f += Math.exp(-dd / (2 * br * br))
           }
-          if (f < 0.5) continue
+          if (f < 0.35) continue
           const dx = x - mouse.x
           const dy = y - mouse.y
           const md = Math.hypot(dx, dy)
@@ -127,8 +127,8 @@ export function GooPanel() {
           const ed = Math.hypot(ex, ey)
           const mask = Math.max(0, 1 - ed)
           if (mask <= 0.02) continue
-          const a = Math.min(0.7, cell.b * mask * (0.55 + near * 0.9))
-          ctx.fillStyle = `rgba(162, 230, 53, ${a.toFixed(3)})`
+          const a = Math.min(0.8, cell.b * mask * (0.55 + near * 0.9))
+          ctx.fillStyle = `rgba(190, 242, 100, ${a.toFixed(3)})`
           ctx.fillText(cell.ch, px, py)
         }
       }
