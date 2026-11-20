@@ -59,25 +59,12 @@ export function GooPanel() {
 
     const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
     let raf = 0
-    let dash = 0
     const t0 = performance.now()
 
     const draw = (now: number) => {
       const t = now - t0
       ctx.clearRect(0, 0, w, h)
       const m = Math.min(w, h)
-
-      // Anel de protocolo: tracejado girando, o "olho" por cima da gosma.
-      dash -= 0.15
-      ctx.save()
-      ctx.strokeStyle = 'rgba(132, 204, 22, 0.4)'
-      ctx.lineWidth = 1.5
-      ctx.setLineDash([6, 12])
-      ctx.lineDashOffset = dash
-      ctx.beginPath()
-      ctx.arc(w / 2, h / 2, m * 0.36, 0, Math.PI * 2)
-      ctx.stroke()
-      ctx.restore()
 
       blobs.forEach((b, i) => {
         const x = b.bx * w + Math.sin(t * b.sp + b.ph) * w * 0.08
@@ -110,14 +97,6 @@ export function GooPanel() {
         className="lain-flicker absolute inset-0 h-full w-full"
         style={{ filter: 'blur(24px) contrast(24)' }}
       />
-      {/* scanlines */}
-      <div className="lain-scanlines pointer-events-none absolute inset-0" />
-      {/* ruído de sinal */}
-      <div className="lain-noise pointer-events-none absolute inset-0" />
-      {/* sweep de refresh */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="lain-sweep absolute inset-x-0 h-28" />
-      </div>
     </div>
   )
 }
