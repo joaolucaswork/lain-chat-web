@@ -114,7 +114,7 @@ export function GooPanel() {
             const dd = (x - b.x) * (x - b.x) + (y - b.y) * (y - b.y)
             f += Math.exp(-dd / (2 * br * br))
           }
-          if (f < 0.35) continue
+          if (f < 0.15) continue
           const dx = x - mouse.x
           const dy = y - mouse.y
           const md = Math.hypot(dx, dy)
