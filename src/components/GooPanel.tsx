@@ -125,11 +125,19 @@ export function GooPanel() {
           const d = Math.hypot(px - cx, py - cy) / maxD
           const mask = Math.max(0, 1 - d * d)
           if (mask <= 0.02) continue
-          const a = Math.min(0.5, cell.b * mask * (0.4 + near * 0.8))
-          ctx.fillStyle = `rgba(132, 204, 22, ${a.toFixed(3)})`
+          const a = Math.min(0.65, cell.b * mask * (0.5 + near * 0.9))
+          ctx.fillStyle = `rgba(162, 230, 53, ${a.toFixed(3)})`
           ctx.fillText(cell.ch, px, py)
         }
       }
+      // Scanlines só no formato dos glifos: apaga 1px a cada 4px do canvas.
+      ctx.save()
+      ctx.globalCompositeOperation = 'destination-out'
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.55)'
+      for (let y = (t / 1000) * 9 % CELL % 4; y < h; y += 4) {
+        ctx.fillRect(0, y, w, 1)
+      }
+      ctx.restore()
       if (!still) raf = requestAnimationFrame(draw)
     }
     draw(t0)
@@ -145,9 +153,7 @@ export function GooPanel() {
   return (
     <div className="relative h-72 overflow-hidden sm:h-96 lg:h-[540px]" aria-hidden>
       <canvas ref={ref} className="absolute inset-0 h-full w-full mix-blend-screen" />
-      <div className="lain-scanlines pointer-events-none absolute inset-0" />
       <div className="lain-noise pointer-events-none absolute inset-0" />
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_60%,rgba(0,0,0,0.5)_100%)]" />
     </div>
   )
 }
