@@ -101,7 +101,7 @@ export async function handleAuth(req: Request, path: string): Promise<Response |
       ? body.name.trim().slice(0, 40)
       : (email ?? 'user').split('@')[0].slice(0, 40);
 
-  let linked: { tenant?: string; apiKey?: string; error?: string };
+  let linked: { tenant?: string; apiKey?: string; created?: boolean; error?: string };
   try {
     const res = await fetch(`${MEMORY_URL}/api/tenant/link`, {
       method: 'POST',
@@ -122,5 +122,13 @@ export async function handleAuth(req: Request, path: string): Promise<Response |
   out.headers.set('Set-Cookie', tenantCookieSet(linked.apiKey));
   // Pré-aquece o roteamento de sessões: primeiro chat já cai no dir estável.
   cacheSlugForKey(linked.apiKey, linked.tenant);
+  // Fonte única no upstream: criado agora → pré-aquece o nome; existente →
+  // invalida o cache para hidratar o nome editado no upstream sem sobrescrevê-lo.
+  try {
+    const { cacheTenantProfile, invalidateTenantProfile } = await import('../lib/profile.ts');
+    const owner = `t-${linked.tenant}`;
+    if (linked.created === true) cacheTenantProfile(owner, displayName);
+    else if (linked.created === false) invalidateTenantProfile(owner);
+  } catch { /* best-effort: chat hidrata no 1º turno */ }
   return out;
 }
