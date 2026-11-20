@@ -11,11 +11,64 @@ import { buildMemoryBlock, getSaoPauloToday, queryGraph, recallMemories, remembe
 import { MEM_TOOLS, callLlmStreamWithRetry, execLlmTool } from './llm.ts';
 import { maybeGenerateTitle } from './titles.ts';
 import { persistSession, sessionKey, streamKey } from './sessions.ts';
-import { personContext, readTenantProfile } from './profile.ts';
+import { personContext, resolveTenantProfile } from './profile.ts';
+import { SYSTEM_PROMPT } from '../config.ts';
+
+export interface TurnToday {
+  iso: string;
+  long: string;
+  time: string;
+}
+
+export interface TurnHistoryItem {
+  role: string;
+  content: string | null;
+}
+
+/**
+ * Monta as mensagens da API com prefixo estável para prompt caching:
+ * - Mensagem 0 (`role: 'system'` único e estável): baseSystem + (who ? `\n\n${who}`).
+ *   Sem hora nem memórias → byte-idêntico durante toda a sessão.
+ * - Mensagens 1..N-1 (`priorHistory`): history.slice(0, -1). Estável turno a turno.
+ * - Última mensagem (`currentTurn`, efêmera — nunca gravada em session.messages):
+ *   bloco efêmero do turno (`turnContext`) injetado antes do texto do usuário.
+ * Sem mutar `session.messages` em nenhum momento.
+ */
+export function buildApiMessages(opts: {
+  baseSystem: string;
+  who: string | null;
+  memBlock: string;
+  today: TurnToday;
+  history: TurnHistoryItem[];
+}): Array<Record<string, unknown>> {
+  const { baseSystem, who, memBlock, today, history } = opts;
+  const stableContent = who ? `${baseSystem}\n\n${who}` : baseSystem;
+  const stable: Record<string, unknown> = { role: 'system', content: stableContent };
+  if (history.length === 0) return [stable];
+  const priorHistory = history.slice(0, -1) as unknown as Array<Record<string, unknown>>;
+  const currentTurn = history[history.length - 1];
+  const turnContext = memBlock
+    ? `Contexto da memória de longo prazo (use quando relevante):\n${memBlock}`
+    : `Data de hoje: ${today.long} (${today.iso}, America/Sao_Paulo), hora: ${today.time}. Use para resolver "hoje/ontem", o dia da semana e "agora/há pouco" na conversa; relativos em memórias futuras resolvem pela data da tag.`;
+  if (currentTurn.role === 'user') {
+    const wrapped: Record<string, unknown> = {
+      role: 'user',
+      content: `<turn_context>\n${turnContext}\n</turn_context>\n\n${currentTurn.content ?? ''}`,
+    };
+    return [stable, ...priorHistory, wrapped];
+  }
+  return [stable, ...priorHistory, { ...currentTurn } as unknown as Record<string, unknown>];
+}
 
 export async function processMessage(session: Session, userMessage: string, signal?: AbortSignal, memKey?: string): Promise<void> {
-  // 1. Hybrid paralelo: recall (vetor) + grafo. Grafo é best-effort, nunca bloqueia.
-  const [hits, graphMd] = await Promise.all([recallMemories(userMessage, memKey), queryGraph(userMessage, memKey)]);
+  // 1. Hybrid paralelo: recall (vetor) + grafo + perfil. Grafo/perfil são
+  // best-effort, nunca bloqueiam. Latência efetiva do perfil = zero quando
+  // já em cache, mascarada pelo recall no 1º miss.
+  const [hits, graphMd, profileName] = await Promise.all([
+    recallMemories(userMessage, memKey),
+    queryGraph(userMessage, memKey),
+    resolveTenantProfile(session.owner, memKey),
+  ]);
   if (signal?.aborted) return;
   const stream = streamKey(session);
   const memBlock = buildMemoryBlock(hits, graphMd);
@@ -24,21 +77,23 @@ export async function processMessage(session: Session, userMessage: string, sign
   console.log(`[bff] memblock: ${hits.length} hits${graphMd ? ' +graph' : ''}` +
     (hits.length ? ` scopes=[${[...byScope.entries()].map(([s, n]) => `${s}:${n}`).join(',')}]` : ''));
 
-  // 2. Monta contexto: system + memórias + histórico recente (sem acumular no session)
-  // Data de hoje vai sempre — mesmo com recall vazio — para o LLM resolver "hoje/ontem".
-  // Nome do visitante (perfil demo, best-effort): entra CITADO como dado,
-  // efêmero por turno — nunca persiste na sessão nem nas memórias.
+  // 2. Monta contexto com prefixo estável (system + perfil + histórico) para
+  // prompt caching; contexto dinâmico (memórias/hora) vai só no turno atual,
+  // efêmero — nunca persiste na sessão nem nas memórias.
+  // Nome do visitante (best-effort): entra CITADO como dado no system estável.
   const history = session.messages.filter(m => m.role !== 'system').slice(-20);
   const today = getSaoPauloToday();
-  const who = personContext(readTenantProfile(session.owner));
-  const apiMessages: Array<Record<string, unknown>> = [
-    session.messages[0] as unknown as Record<string, unknown>,
-    ...(who ? [{ role: 'system', content: who }] : []),
-    ...(memBlock
-      ? [{ role: 'system', content: `Contexto da memória de longo prazo (use quando relevante):\n${memBlock}` }]
-      : [{ role: 'system', content: `Data de hoje: ${today.long} (${today.iso}, America/Sao_Paulo), hora: ${today.time}. Use para resolver "hoje/ontem", o dia da semana e "agora/há pouco" na conversa; relativos em memórias futuras resolvem pela data da tag.` }]),
-    ...(history as unknown as Array<Record<string, unknown>>),
-  ];
+  const who = personContext(profileName);
+  const baseSystem = (typeof session.messages[0]?.content === 'string' && session.messages[0].content
+    ? session.messages[0].content
+    : SYSTEM_PROMPT) as string;
+  const apiMessages: Array<Record<string, unknown>> = buildApiMessages({
+    baseSystem,
+    who,
+    memBlock,
+    today,
+    history: history as unknown as TurnHistoryItem[],
+  });
 
   // 3. Loop de tools (máx 3 turnos) com stream do texto
   let streamed = false;
@@ -73,7 +128,7 @@ export async function processMessage(session: Session, userMessage: string, sign
   broadcast(stream, 'token_end', { text: streamed ? '' : finalText });
   broadcast(stream, 'done', {});
 
-  // 5. Remember em background
+  // 5. Remember em background (só o texto limpo do usuário — sem <turn_context>)
   rememberTurn(userMessage, finalText, memKey);
 }
 
