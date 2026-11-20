@@ -4,15 +4,16 @@
  * POST /api/tenant/signup {name} → cria o tenant no lain-memory, grava a key
  *   num cookie HttpOnly e devolve {tenant}. Nome duplicado → 409 (a UI pede outro).
  * POST /api/tenant/logout → limpa o cookie (sessões ficam órfãs no disco do dono).
- * DELETE /api/tenant/account → exclusão total (LGPD): dados + registro do
- *   tenant no upstream, usuário no Supabase Auth, sessões/profile locais.
- *   O nome é liberado e o cookie é limpo. Sem undo.
+ * DELETE /api/tenant/account → exclusão total (LGPD): dados + tombstone do
+ *   registro no upstream, usuário no Supabase Auth, sessões/cache locais.
+ *   O slug vai para o cemitério (tombstone, nunca liberado) e o cookie é
+ *   limpo. Sem undo.
  * POST /api/tenant/mcp-token → emite um token MCP dedicado (upstream minta e
  *   gira o anel; a sessão cookie continua válida). Devolve {apiKey} UMA vez —
  *   o frontend mostra para copiar no client MCP (opencode/Claude Desktop).
- * GET /api/tenant/profile → {name} (nome atual do visitante, null = sem perfil).
- * POST /api/tenant/profile {name} → valida, salva no BFF e espelha no
- *   upstream (best-effort); devolve {name}. Nunca troca o slug.
+ * GET /api/tenant/profile → {name} (fonte única no upstream, BFF cache-only).
+ * POST /api/tenant/profile {name} → valida, salva no canônico upstream
+ *   (fail-hard) e atualiza o cache do BFF; devolve {name}. Nunca troca o slug.
  * GET /api/me → {mode:'owner'} | {mode:'demo'} | {mode:'tenant', tenant}.
  */
 import { MEMORY_URL } from '../config.ts';
@@ -38,6 +39,8 @@ export async function handleTenant(req: Request, path: string): Promise<Response
     if (name.length < 2) return json({ error: 'Informe um nome (mín. 2 letras)' }, 400);
     try {
       const created = await proxyTenantSignup(name);
+      const { cacheTenantProfile } = await import('../lib/profile.ts');
+      cacheTenantProfile(`t-${created.tenant}`, name);
       const res = json({ ok: true, tenant: created.tenant });
       res.headers.set('Set-Cookie', tenantCookieSet(created.apiKey));
       return res;
@@ -67,30 +70,13 @@ export async function handleTenant(req: Request, path: string): Promise<Response
     }
   }
 
-  // ── Perfil do visitante (nome que o agente usa; tema fica no frontend) ──
+  // ── Perfil do visitante (fonte única no upstream; BFF cache-only) ──
   if (req.method === 'GET' && path === '/api/tenant/profile') {
     const key = tenantKeyFromCookie(req);
     if (!key) return json({ error: 'no tenant session' }, 401);
-    const { readTenantProfile } = await import('../lib/profile.ts');
+    const { resolveTenantProfile } = await import('../lib/profile.ts');
     const owner = await resolveOwner(req);
-    let name = readTenantProfile(owner);
-    if (name === null) {
-      // Conta anterior ao perfil local: o upstream tem o nome do signup —
-      // importa uma vez (best-effort) para o agente já chamar pelo nome.
-      try {
-        const res = await fetch(`${MEMORY_URL}/api/tenant/profile`, {
-          headers: { Authorization: `Bearer ${key}` },
-          signal: AbortSignal.timeout(8_000),
-        });
-        if (res.ok) {
-          const data = (await res.json().catch(() => null)) as { name?: unknown } | null;
-          const { writeTenantProfile } = await import('../lib/profile.ts');
-          if (typeof data?.name === 'string' && writeTenantProfile(owner, data.name).ok) {
-            name = readTenantProfile(owner);
-          }
-        }
-      } catch { /* sem upstream = sem nome (chat segue normal) */ }
-    }
+    const name = await resolveTenantProfile(owner, key);
     return json({ ok: true, name });
   }
 
@@ -99,20 +85,28 @@ export async function handleTenant(req: Request, path: string): Promise<Response
     if (!key) return json({ error: 'no tenant session' }, 401);
     let body: Record<string, unknown>;
     try { body = await req.json(); } catch { return json({ error: 'Invalid JSON' }, 400); }
-    const { writeTenantProfile } = await import('../lib/profile.ts');
+    const { sanitizeDisplayName, cacheTenantProfile } = await import('../lib/profile.ts');
     const owner = await resolveOwner(req);
-    const saved = writeTenantProfile(owner, body.name);
-    if (!saved.ok) return json({ error: saved.error }, 400);
-    // Espelha no canônico upstream (best-effort: perfil local já vale).
+    const clean = sanitizeDisplayName(body.name);
+    if (!clean.ok) return json({ error: clean.error }, 400);
+    // Fonte canônica é o upstream: fail-hard se rejeitar/falhar (BFF é só cache).
     try {
-      await fetch(`${MEMORY_URL}/api/tenant/profile`, {
+      const res = await fetch(`${MEMORY_URL}/api/tenant/profile`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: saved.name }),
+        body: JSON.stringify({ name: clean.name }),
         signal: AbortSignal.timeout(8_000),
       });
-    } catch { /* upstream fora = sync fica para a próxima leitura */ }
-    return json({ ok: true, name: saved.name });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: unknown } | null;
+        const detail = typeof data?.error === 'string' ? data.error : `upstream → ${res.status}`;
+        return json({ error: detail }, 502);
+      }
+    } catch {
+      return json({ error: 'lain-memory unavailable' }, 502);
+    }
+    cacheTenantProfile(owner, clean.name);
+    return json({ ok: true, name: clean.name });
   }
 
   // ── Logout (só limpa o cookie; os dados ficam até o wipe) ──
@@ -122,9 +116,10 @@ export async function handleTenant(req: Request, path: string): Promise<Response
     return res;
   }
 
-  // ── Exclusão total da conta (LGPD): dados + registro no upstream, usuário
-  // no Supabase Auth, sessões + perfil locais. O nome é liberado (um novo
-  // signup pode reutilizá-lo) e o cookie é limpo. Sem undo.
+  // ── Exclusão total da conta (LGPD): dados + tombstone no upstream, usuário
+  // no Supabase Auth, sessões + cache locais. O slug entra no cemitério
+  // (tombstone, nunca liberado — um novo signup não reutiliza o slug) e o
+  // cookie é limpo. Sem undo.
   if (req.method === 'DELETE' && path === '/api/tenant/account') {
     const key = tenantKeyFromCookie(req);
     if (!key) return json({ error: 'no tenant session' }, 401);
@@ -134,9 +129,14 @@ export async function handleTenant(req: Request, path: string): Promise<Response
         headers: { Authorization: `Bearer ${key}` },
         signal: AbortSignal.timeout(60_000),
       });
-      const data = (await res.json().catch(() => null)) as { sub?: unknown } | null;
-      if (!res.ok) return json({ error: 'account delete failed' }, 502);
-      // O registro foi purgado e a key morreu — o sub veio no corpo, é a
+      const data = (await res.json().catch(() => null)) as { sub?: unknown; error?: unknown } | null;
+      // Fail-closed: wipe parcial (500) não apaga sessões/cookie locais —
+      // o caller deve dar retry com a mesma key antes de limpar o client.
+      if (!res.ok) {
+        const detail = typeof data?.error === 'string' ? data.error : `upstream → ${res.status}`;
+        return json({ error: `account delete failed (${detail}) — retry, nothing deleted locally` }, 502);
+      }
+      // O registro foi tombstoned e a key morreu — o sub veio no corpo, é a
       // única chance de excluir o usuário no Auth. Falha aqui não reverte
       // os dados (já eliminados): loga e segue — um re-login criaria um
       // tenant zerado, estado final equivalente à exclusão total.
@@ -152,9 +152,9 @@ export async function handleTenant(req: Request, path: string): Promise<Response
       // Transcripts saem junto (mesmo dono estável) — sem órfãos no disco.
       const { deleteOwnerSessions } = await import('../lib/sessions.ts');
       const wipedSessions = await deleteOwnerSessions(await resolveOwner(req));
-      // Perfil (nome) é PII: sai junto na exclusão.
-      const { deleteTenantProfile } = await import('../lib/profile.ts');
-      deleteTenantProfile(await resolveOwner(req));
+      // Perfil (nome) é PII: sai junto na exclusão (+ legado em disco).
+      const { invalidateTenantProfile } = await import('../lib/profile.ts');
+      invalidateTenantProfile(await resolveOwner(req));
       const out = json({ ok: true, wipedSessions });
       out.headers.set('Set-Cookie', tenantCookieClear());
       return out;
