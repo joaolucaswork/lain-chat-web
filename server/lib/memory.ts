@@ -325,7 +325,7 @@ export async function listVaultMemories(key?: string): Promise<VaultMemory[]> {
   };
   // 1. Global (sem filtro de projeto)
   try {
-    const data = await fetchJson(`${MEMORY_URL}/api/memory/list`, { limit: 200 }, 5000, key);
+    const data = await fetchJson(`${MEMORY_URL}/api/memory/list`, { limit: 500 }, 5000, key);
     pushBatch(data, 'global');
   } catch (err) {
     console.error('[bff] vault memories failed (global):', err instanceof Error ? err.message : err);
@@ -339,11 +339,14 @@ export async function listVaultMemories(key?: string): Promise<VaultMemory[]> {
   await Promise.all(projects.map(async (p) => {
     if (!p || p === 'global') return;
     try {
-      const data = await fetchJson(`${MEMORY_URL}/api/memory/list`, { project: p, limit: 200 }, 5000, key);
+      const data = await fetchJson(`${MEMORY_URL}/api/memory/list`, { project: p, limit: 500 }, 5000, key);
       pushBatch(data, p);
     } catch (err) {
       console.error(`[bff] vault memories failed (project=${p}):`, err instanceof Error ? err.message : err);
     }
   }));
+  // getAll da VPS é página única sem ordenação garantida — ordena aqui por
+  // mais recentes primeiro para a memória nova aparecer no topo do vault.
+  out.sort((a, b) => String(b.created || '').localeCompare(String(a.created || '')));
   return out;
 }

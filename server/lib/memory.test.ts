@@ -3,6 +3,7 @@ import {
   buildMemoryBlock,
   fetchJson,
   getSaoPauloToday,
+  listVaultMemories,
   memDate,
   shouldQueryGraph,
   stripQuestionFraming,
@@ -57,6 +58,23 @@ describe('fetchJson retry', () => {
     }) as typeof fetch;
     await expect(fetchJson('https://x/api/memory/remember', {}, 50, undefined, 3)).rejects.toThrow('timed out');
     expect(calls).toBe(1);
+  });
+});
+
+describe('listVaultMemories', () => {
+  test('ordena por mais recentes primeiro (getAll da VPS não garante ordem)', async () => {
+    const items = [
+      { id: 'old', memory: 'fato antigo', created_at: '2026-01-01T00:00:00Z' },
+      { id: 'new', memory: 'fato novo', created_at: '2026-11-20T00:00:00Z' },
+      { id: 'nodate', memory: 'fato sem data' },
+    ];
+    globalThis.fetch = (async (url: string | URL | Request) => {
+      const u = String(url);
+      if (u.endsWith('/api/graph/nodes')) return okJson([]);
+      return okJson(items);
+    }) as typeof fetch;
+    const out = await listVaultMemories('k-test');
+    expect(out.map((m) => m.id)).toEqual(['new', 'old', 'nodate']);
   });
 });
 
