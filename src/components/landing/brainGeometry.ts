@@ -132,7 +132,7 @@ function sphereDir(rand: () => number, out: Float32Array, o: number): void {
   out[o + 2] = z / l
 }
 
-function lobeOf(x: number, y: number, zl: number): number {
+function lobeOf(y: number, zl: number): number {
   if (zl > 0.3) return 1
   if (zl < -0.35) return 4
   if (y < -0.12 && zl > -0.45) return 3
@@ -185,7 +185,7 @@ function hemiPoint(
   out[o] = x
   out[o + 1] = y
   out[o + 2] = z
-  return { ridge: Math.pow(clamp01(ridge), 1.3), lobe: lobeOf(x, y, zl) }
+  return { ridge: Math.pow(clamp01(ridge), 1.3), lobe: lobeOf(y, zl) }
 }
 
 /** Cerebelo: menor, denso, posterior-inferior, pregas finas. */
