@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { CheckCircle, Eye, EyeSlash } from '@phosphor-icons/react'
+import { RouteFallback } from '@/components/RouteFallback'
 import { isSupabaseConfigured, supabase } from '@/lib/supabase'
 import { setTenantName } from '@/hooks/useMe'
 
@@ -131,15 +132,32 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
+  /**
+   * checking = conferindo sessão no storage (retorno do OAuth?);
+   * oauth = há sessão, exchange em curso (skeleton do chat, nunca o form);
+   * none = sem sessão, mostra o formulário de login.
+   */
+  const [sessionCheck, setSessionCheck] = useState<'checking' | 'oauth' | 'none'>('checking')
 
   // Volta do OAuth (Google): a sessão já está no storage — só falta o exchange.
   useEffect(() => {
     const client = supabase()
-    if (!client) return
+    if (!client) {
+      setSessionCheck('none')
+      return
+    }
     let alive = true
-    client.auth.getSession().then(({ data }) => {
-      if (!alive || !data.session) return
-      void exchange(data.session.access_token, data.session.user.email ?? '')
+    void client.auth.getSession().then(({ data }) => {
+      if (!alive) return
+      if (!data.session) {
+        setSessionCheck('none')
+        return
+      }
+      setSessionCheck('oauth')
+      void exchange(data.session.access_token, data.session.user.email ?? '').finally(() => {
+        // Sucesso = onDone recarrega a página; falha = volta pro form com o erro.
+        if (alive) setSessionCheck('none')
+      })
     })
     return () => {
       alive = false
@@ -341,12 +359,16 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
     if (!client || busy) return
     setBusy(true)
     setError('')
+    setSessionCheck('oauth')
     try {
       const { error } = await client.auth.signInWithOAuth({
         provider: 'google',
         options: { redirectTo: window.location.origin },
       })
-      if (error) setError(friendlyAuthError(error.message))
+      if (error) {
+        setError(friendlyAuthError(error.message))
+        setSessionCheck('none')
+      }
       // Sucesso = redirect; o exchange acontece na volta (useEffect).
     } finally {
       setBusy(false)
@@ -368,6 +390,12 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
     'w-full rounded bg-primary px-4 py-3 font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40'
   const ghostBtn =
     'flex w-full items-center justify-center gap-2 rounded border border-neutral-300 bg-white px-4 py-3 font-medium text-neutral-900 disabled:opacity-40'
+
+  // Retorno do OAuth / clique no Google: skeleton da tela principal em vez
+  // do formulário de login (flash regressivo). Checking inicial = blank
+  // neutro (a checagem é local, ~ms) para não piscar skeleton errado.
+  if (sessionCheck === 'oauth') return <RouteFallback variant="chat" />
+  if (sessionCheck === 'checking') return <div className="h-dvh bg-white" />
 
   // ── Etapa 1: só email (centralizado) ──
   if (step === 1) {
