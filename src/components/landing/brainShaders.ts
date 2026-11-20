@@ -88,9 +88,9 @@ void main() {
   float gate = smoothstep(0.12, 0.20, f);
   vec2 dm = base - uMouse;
   float md = length(dm);
-  float near = (md < 170.0 && md > 0.01) ? (170.0 - md) / 170.0 : 0.0;
+  float prox = (md < 170.0 && md > 0.01) ? (170.0 - md) / 170.0 : 0.0;
   vec2 dir = md > 0.01 ? dm / md : vec2(0.0);
-  vec2 homeW = base + dir * near * 52.0 * uGlow * (1.0 - uMorph);
+  vec2 homeW = base + dir * prox * 52.0 * uGlow * (1.0 - uMorph);
   vec2 halfv = vec2(uRes.x * 0.5, uRes.y * 0.5);
   float ed = length((homeW - halfv) / halfv);
   float edge = clamp((1.0 - ed) / 0.15, 0.0, 1.0);
@@ -110,7 +110,7 @@ void main() {
   }
   vUv = (aUV + vec2(mod(g, 8.0), floor(g / 8.0))) / 8.0;
   float bright = 0.25 + 0.5 * h21(vec2(g * 7.13 + 0.5, seed * 3.7));
-  float aHero = min(0.8, bright * edge * (0.55 + near * uGlow * 0.9)) * gate;
+  float aHero = min(0.8, bright * edge * (0.55 + prox * uGlow * 0.9)) * gate;
   float fogA = mix(0.30, 1.0, depth);
   float aBrain = (0.30 + 0.70 * ridge) * fogA;
   float wave = synWave(aBrainPos);

@@ -16,25 +16,37 @@ import type { LandingProgress } from './useLandingProgress'
 const CELL = 15
 const FOCAL = 2.4
 
-function compileSrc(gl: WebGL2RenderingContext, type: number, src: string): WebGLShader | null {
+function compileSrc(
+  gl: WebGL2RenderingContext,
+  type: number,
+  src: string,
+  label: string,
+): WebGLShader | null {
   const sh = gl.createShader(type)
   if (!sh) return null
   gl.shaderSource(sh, src)
   gl.compileShader(sh)
-  if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) return null
+  if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+    // WHY log: fallback silencioso escondeu o `near` reservado por 3 etapas.
+    console.error(`[BrainStage] falha ao compilar ${label}:`, gl.getShaderInfoLog(sh))
+    return null
+  }
   return sh
 }
 
-function makeProg(gl: WebGL2RenderingContext, vs: string, fs: string): WebGLProgram | null {
-  const v = compileSrc(gl, gl.VERTEX_SHADER, vs)
-  const f = compileSrc(gl, gl.FRAGMENT_SHADER, fs)
+function makeProg(gl: WebGL2RenderingContext, vs: string, fs: string, label: string): WebGLProgram | null {
+  const v = compileSrc(gl, gl.VERTEX_SHADER, vs, `${label} vertex`)
+  const f = compileSrc(gl, gl.FRAGMENT_SHADER, fs, `${label} fragment`)
   if (!v || !f) return null
   const prog = gl.createProgram()
   if (!prog) return null
   gl.attachShader(prog, v)
   gl.attachShader(prog, f)
   gl.linkProgram(prog)
-  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return null
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+    console.error(`[BrainStage] falha ao linkar ${label}:`, gl.getProgramInfoLog(prog))
+    return null
+  }
   return prog
 }
 
@@ -120,8 +132,8 @@ export function BrainStage({
       setFailed(true)
       return
     }
-    const progP = makeProg(gl, VERT_SRC, FRAG_SRC)
-    const progL = makeProg(gl, LINE_VERT_SRC, LINE_FRAG_SRC)
+    const progP = makeProg(gl, VERT_SRC, FRAG_SRC, 'pontos')
+    const progL = makeProg(gl, LINE_VERT_SRC, LINE_FRAG_SRC, 'linhas')
     if (!progP || !progL) {
       setFailed(true)
       return
