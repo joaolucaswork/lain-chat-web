@@ -14,7 +14,9 @@ export function createGlyphAtlas(): HTMLCanvasElement {
   if (!ctx) return canvas
   ctx.clearRect(0, 0, canvas.width, canvas.height)
   ctx.fillStyle = '#ffffff'
-  ctx.font = `28px ui-monospace, Menlo, monospace`
+  // Glifo grande na célula (34/40): no quad de 15px rende ~13px, par com os
+  // 12px do GooPanel 2D. Sem mipmaps no upload (LINEAR direto = nítido).
+  ctx.font = `34px ui-monospace, Menlo, monospace`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   for (let i = 0; i < GLYPH_ORDER.length; i++) {
