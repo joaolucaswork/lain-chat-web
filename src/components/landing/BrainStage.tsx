@@ -101,7 +101,14 @@ function projectCPU(
   return { x: cx + x * scale * ps, y: cy + y2 * scale * ps }
 }
 
-export function BrainStage({ progressRef }: { progressRef: React.RefObject<LandingProgress> }) {
+export function BrainStage({
+  progressRef,
+  fixedMorph,
+}: {
+  progressRef: React.RefObject<LandingProgress>
+  /** Mobile (Seção 2): cérebro fixo em morph=1, sem depender do scroll. */
+  fixedMorph?: number
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [failed, setFailed] = useState(false)
 
@@ -287,7 +294,7 @@ export function BrainStage({ progressRef }: { progressRef: React.RefObject<Landi
     }
 
     const draw = (now: number) => {
-      const morph = progressRef.current.morph
+      const morph = fixedMorph ?? progressRef.current.morph
       const boost = progressRef.current.pulse
       const tMs = still ? 0 : now - t0
       const time = tMs / 1000
@@ -431,7 +438,7 @@ export function BrainStage({ progressRef }: { progressRef: React.RefObject<Landi
       canvas.parentElement?.removeEventListener('pointerleave', onLeave)
       gl.getExtension('WEBGL_lose_context')?.loseContext()
     }
-  }, [failed, progressRef])
+  }, [failed, progressRef, fixedMorph])
 
   if (failed) return <GooPanel />
   return (

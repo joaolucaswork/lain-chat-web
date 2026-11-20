@@ -184,6 +184,9 @@ export function LandingPage() {
                 Cada conversa vira estrutura, não histórico perdido.
               </h2>
               <MemoryBlocks />
+              <div className="mt-10 lg:hidden" aria-hidden>
+                <BrainStage progressRef={progressRef} fixedMorph={1} />
+              </div>
             </section>
             <section ref={s3Ref} aria-label="Use em qualquer agente" className="py-20 sm:py-28">
               <p className="font-mono text-[11px] tracking-[0.18em] text-muted-foreground">

@@ -80,6 +80,14 @@ export function GooPanel() {
     const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
     let raf = 0
     const t0 = performance.now()
+    // WHY bateria: o painel mobile fica montado mas oculto no desktop
+    // (lg:hidden) e vice-versa — fora da viewport o loop pausa.
+    let visible = true
+    const io = new IntersectionObserver(([e]) => {
+      visible = e.isIntersecting
+      if (visible && !still && !raf) raf = requestAnimationFrame(draw)
+    })
+    io.observe(canvas)
 
     const draw = (now: number) => {
       const t = now - t0
@@ -158,12 +166,15 @@ export function GooPanel() {
         ctx.fillRect(0, y, w, 1)
       }
       ctx.restore()
-      if (!still) raf = requestAnimationFrame(draw)
+      if (!still && visible) raf = requestAnimationFrame(draw)
+      else raf = 0
     }
     draw(t0)
 
     return () => {
       cancelAnimationFrame(raf)
+      raf = 0
+      io.disconnect()
       ro.disconnect()
       canvas.parentElement?.removeEventListener('pointermove', onMove)
       canvas.parentElement?.removeEventListener('pointerleave', onLeave)
