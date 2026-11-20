@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CheckCircle, Eye, EyeSlash } from '@phosphor-icons/react'
 import { RouteFallback } from '@/components/RouteFallback'
 import { isSupabaseConfigured, supabase } from '@/lib/supabase'
@@ -136,8 +136,18 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
    * checking = conferindo sessão no storage (retorno do OAuth?);
    * oauth = há sessão, exchange em curso (skeleton do chat, nunca o form);
    * none = sem sessão, mostra o formulário de login.
+   * WHY callback travado em skeleton: o Supabase usa PKCE (?code= na URL)
+   * e troca o código por sessão via rede — um getSession() único conclui
+   * "sem sessão" antes disso e piscava o form no meio do login. O estado
+   * inicial já nasce 'oauth' quando a URL é de callback, e o SIGNED_IN
+   * (listener) cobre a detecção tardia.
    */
-  const [sessionCheck, setSessionCheck] = useState<'checking' | 'oauth' | 'none'>('checking')
+  const isAuthCallback =
+    typeof window !== 'undefined' && /[?#].*(code=|access_token=)/.test(window.location.href)
+  const [sessionCheck, setSessionCheck] = useState<'checking' | 'oauth' | 'none'>(
+    isAuthCallback ? 'oauth' : 'checking',
+  )
+  const exchangedRef = useRef(false)
 
   // Volta do OAuth (Google): a sessão já está no storage — só falta o exchange.
   useEffect(() => {
@@ -147,20 +157,35 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
       return
     }
     let alive = true
-    void client.auth.getSession().then(({ data }) => {
-      if (!alive) return
-      if (!data.session) {
-        setSessionCheck('none')
-        return
-      }
+    const runExchange = (token: string, email: string) => {
+      if (exchangedRef.current) return
+      exchangedRef.current = true
       setSessionCheck('oauth')
-      void exchange(data.session.access_token, data.session.user.email ?? '').finally(() => {
+      void exchange(token, email).finally(() => {
         // Sucesso = onDone recarrega a página; falha = volta pro form com o erro.
         if (alive) setSessionCheck('none')
       })
+    }
+    void client.auth.getSession().then(({ data }) => {
+      if (!alive) return
+      if (data.session) {
+        runExchange(data.session.access_token, data.session.user.email ?? '')
+      } else if (!isAuthCallback) {
+        setSessionCheck('none')
+      }
+      // Callback sem sessão ainda: mantém skeleton até o SIGNED_IN chegar.
+    })
+    const {
+      data: { subscription },
+    } = client.auth.onAuthStateChange((event, session) => {
+      if (!alive || !session) return
+      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
+        runExchange(session.access_token, session.user.email ?? '')
+      }
     })
     return () => {
       alive = false
+      subscription.unsubscribe()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
