@@ -189,15 +189,38 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
         if (alive && !ok) setSessionCheck('none')
       })
     }
-    void client.auth.getSession().then(({ data }) => {
-      if (!alive) return
-      if (data.session) {
-        runExchange(data.session.access_token, data.session.user.email ?? '')
-      } else if (!isAuthCallback) {
-        setSessionCheck('none')
+    const isCallbackNow = () => /[?#].*(code=|access_token=)/.test(window.location.href)
+    const settleNoSession = () => {
+      // Volta de cancelamento (back no Google / erro no callback): form de novo.
+      if (/[?#].*(error=|error_code=)/.test(window.location.href)) {
+        setError('Login com Google cancelado. Tente de novo.')
       }
-      // Callback sem sessão ainda: mantém skeleton até o SIGNED_IN chegar.
-    })
+      setSessionCheck('none')
+    }
+    const checkSession = () => {
+      void client.auth.getSession().then(({ data }) => {
+        if (!alive) return
+        if (data.session) {
+          runExchange(data.session.access_token, data.session.user.email ?? '')
+        } else if (!isCallbackNow()) {
+          settleNoSession()
+        }
+        // Callback sem sessão ainda: mantém skeleton até o SIGNED_IN chegar.
+      })
+    }
+    checkSession()
+    // WHY pageshow: o back button restaura a página do bfcache com o estado
+    // congelado (skeleton) sem remontar — sem isso o skeleton carregava
+    // infinitamente após cancelar no Google.
+    const onPageShow = () => {
+      if (exchangedRef.current) return
+      setSessionCheck((cur) => {
+        if (cur === 'oauth' && !isCallbackNow()) return 'checking'
+        return cur
+      })
+      checkSession()
+    }
+    window.addEventListener('pageshow', onPageShow)
     const {
       data: { subscription },
     } = client.auth.onAuthStateChange((event, session) => {
@@ -209,6 +232,7 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
     return () => {
       alive = false
       subscription.unsubscribe()
+      window.removeEventListener('pageshow', onPageShow)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
