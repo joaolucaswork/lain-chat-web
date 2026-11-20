@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { GooPanel } from '@/components/GooPanel'
 import { ViscoseH1 } from '@/components/ViscoseH1'
 import { McpTabs } from '@/components/landing/McpTabs'
+import { BrainStage } from '@/components/landing/BrainStage'
 import { useLandingProgress, type LandingProgress } from '@/components/landing/useLandingProgress'
 
 /**
@@ -58,15 +59,14 @@ function PublicShell({
 }
 
 /**
- * Slot do stage direito. Etapa 1: GooPanel 2D. Etapa 2 troca por BrainStage
- * WebGL2 lendo progressRef (morph/pulse) — nenhuma mudança no layout.
+ * Slot do stage direito. Etapa 2: BrainStage WebGL2 (Hero, morph=0) com
+ * fallback p/ GooPanel. Etapa 3 liga o morph p/ o cérebro sem mexer no layout.
  */
 function StageSlot({ progressRef }: { progressRef: React.RefObject<LandingProgress> }) {
-  void progressRef
   return (
     <div className="flex h-full items-center">
       <div className="w-full">
-        <GooPanel />
+        <BrainStage progressRef={progressRef} />
       </div>
     </div>
   )
