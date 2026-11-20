@@ -85,7 +85,8 @@ void main() {
     float r = uBlobs[i].z;
     f += exp(-dot(d, d) / (2.0 * r * r));
   }
-  float gate = smoothstep(0.12, 0.20, f);
+  // Limiar duro igual ao original ("if f < 0.15 continue"): campo cheio.
+  float gate = step(0.15, f);
   vec2 dm = base - uMouse;
   float md = length(dm);
   float prox = (md < 170.0 && md > 0.01) ? (170.0 - md) / 170.0 : 0.0;
@@ -109,7 +110,7 @@ void main() {
     g = floor(h21(vec2(seed * 47.3, q * 7.7)) * 31.0);
   }
   vUv = (aUV + vec2(mod(g, 8.0), floor(g / 8.0))) / 8.0;
-  float bright = 0.25 + 0.5 * h21(vec2(g * 7.13 + 0.5, seed * 3.7));
+  float bright = 0.25 + 0.75 * h21(vec2(g * 7.13 + 0.5, seed * 3.7));
   float aHero = min(0.8, bright * edge * (0.55 + prox * uGlow * 0.9)) * gate;
   float fogA = mix(0.30, 1.0, depth);
   float aBrain = (0.30 + 0.70 * ridge) * fogA;
