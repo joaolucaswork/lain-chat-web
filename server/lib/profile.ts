@@ -1,25 +1,25 @@
 /**
  * Perfil do visitante (demo): nome de exibição editável.
  *
- * WHY um store próprio no BFF: o `localStorage` não chega ao servidor, e o
- * nome canônico do upstream (`tenants.json`) só é gravado no signup/link.
- * O BFF guarda o nome atual por dono (`t-<slug>/profile.json`, 0600) e o
- * chat injeta no prompt por turno — sem tocar no slug (identidade/isolamento)
- * nem nas memórias já salvas. Nunca vai para log.
+ * WHY fonte única no `lain-memory`: o BFF mantém APENAS cache em memória
+ * por dono (sem `profile.json` novo em disco). O canônico mora no upstream
+ * (`tenants.json`); o BFF hidrata via `GET /api/tenant/profile` em miss.
+ * Nome nunca vai para log.
  */
-import { readFileSync, mkdirSync, writeFileSync, unlinkSync, chmodSync, renameSync } from 'node:fs';
+import { unlinkSync } from 'node:fs';
 import { join } from 'node:path';
-import { SESSIONS_DIR } from '../config.ts';
+import { MEMORY_URL, SESSIONS_DIR } from '../config.ts';
 import { isSafeOwner } from './sessions.ts';
 import { OWNER } from './tenant.ts';
 
 const PROFILE_FILE = 'profile.json';
-const PROFILE_TTL = 5 * 60_000;
+export const PROFILE_HIT_TTL = 5 * 60_000;
+export const PROFILE_MISS_TTL = 15_000;
 
-/** Override de testes (mesmo padrão de tenants.json). Null = produção. */
+/** Override de testes (base do profile.json legado — nunca escreve novo). */
 let _baseOverride: string | null = null;
 
-/** Test-only: redirect the profile base dir (pass null to restore). */
+/** Test-only: redirect the legacy profile base dir (pass null to restore). */
 export function __setProfileBaseForTests(p: string | null): void {
   _baseOverride = p;
   _cache.clear();
@@ -38,6 +38,11 @@ function profileFile(owner: string): string {
   return join(profileDir(owner), PROFILE_FILE);
 }
 
+function removeLegacyProfileFile(owner: string): void {
+  if (!isSafeOwner(owner)) return;
+  try { unlinkSync(profileFile(owner)); } catch { /* já sumiu / nunca existiu */ }
+}
+
 // Controles C0 + DEL viram espaço (não colam palavras); aspas caem
 // (quebra de citação no prompt).
 const CONTROL_CHARS = /[\u0000-\u001F\u007F]/g;
@@ -54,61 +59,79 @@ export function sanitizeDisplayName(raw: unknown): { ok: true; name: string } | 
   return { ok: true, name };
 }
 
-// Cache em memória por dono (TTL 5min): o chat lê por turno, sem I/O quente.
+// Cache em memória por dono: hit 5min (nome válido), miss 15s (null/falha
+// transitória — nunca trava o nome em null por 5 min). Teto 2000 entradas.
 const _cache = new Map<string, { at: number; name: string | null }>();
 
-/** Nome atual do dono, ou null (sem perfil / dono inválido / disco ilegível). */
-export function readTenantProfile(owner: string): string | null {
-  if (!isSafeOwner(owner)) return null;
-  const now = Date.now();
-  const hit = _cache.get(owner);
-  if (hit && now - hit.at < PROFILE_TTL) return hit.name;
-  let name: string | null = null;
-  try {
-    const parsed = JSON.parse(readFileSync(profileFile(owner), 'utf-8')) as { name?: unknown };
-    const clean = sanitizeDisplayName(parsed?.name);
-    if (clean.ok) name = clean.name;
-  } catch { /* sem perfil = sem nome */ }
+function cacheSet(owner: string, name: string | null): void {
   if (_cache.size > 2000) _cache.clear();
-  _cache.set(owner, { at: now, name });
-  return name;
+  _cache.set(owner, { at: Date.now(), name });
 }
 
-/** Grava o perfil do dono (cria o dir 0700; arquivo 0600, escrita atômica). */
-export function writeTenantProfile(owner: string, rawName: unknown): { ok: true; name: string } | { ok: false; error: string } {
-  if (!isSafeOwner(owner)) return { ok: false, error: 'unknown owner' };
+/** Pré-aquece / atualiza o cache após signup, login ou POST /api/tenant/profile. */
+export function cacheTenantProfile(owner: string, rawName: unknown): void {
+  if (!isSafeOwner(owner)) return;
   const clean = sanitizeDisplayName(rawName);
-  if (!clean.ok) return clean;
-  try {
-    const dir = profileDir(owner);
-    mkdirSync(dir, { recursive: true });
-    chmodSync(dir, 0o700);
-    const target = profileFile(owner);
-    const temp = `${target}.${process.pid}.tmp`;
-    writeFileSync(temp, JSON.stringify({ name: clean.name, updatedAt: new Date().toISOString() }), { encoding: 'utf-8', mode: 0o600 });
-    chmodSync(temp, 0o600);
-    renameSync(temp, target);
-    chmodSync(target, 0o600);
-  } catch (err) {
-    console.error('[bff] persist profile failed:', err instanceof Error ? err.message : err);
-    return { ok: false, error: 'could not save profile' };
-  }
-  _cache.set(owner, { at: Date.now(), name: clean.name });
-  return { ok: true, name: clean.name };
+  if (!clean.ok) return;
+  cacheSet(owner, clean.name);
 }
 
-/** Remove o perfil do dono (wipe LGPD: nome é PII). */
-export function deleteTenantProfile(owner: string): void {
+/** Limpa o cache no DELETE /api/tenant/account, wipe ou re-login (+ legado em disco). */
+export function invalidateTenantProfile(owner: string): void {
   if (!isSafeOwner(owner)) return;
   _cache.delete(owner);
-  try { unlinkSync(profileFile(owner)); } catch { /* já sumiu */ }
+  removeLegacyProfileFile(owner);
 }
 
 /**
- * Linha de contexto por turno: o nome entra CITADO como dado, nunca como
- * instrução concatenada — display name é input do usuário.
+ * Nome atual do dono, ou null. Ordem:
+ * 1. Cache válido → imediato (0 I/O, 0 rede).
+ * 2. Sem memKey (owner/single-user sem registro no upstream) → null.
+ * 3. Miss com memKey → GET upstream (timeout 2s, best-effort; sanitiza),
+ *    popula o cache e retorna.
+ */
+export async function resolveTenantProfile(
+  owner: string,
+  memKey?: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<string | null> {
+  if (!isSafeOwner(owner)) return null;
+  const now = Date.now();
+  const hit = _cache.get(owner);
+  if (hit) {
+    const ttl = hit.name !== null ? PROFILE_HIT_TTL : PROFILE_MISS_TTL;
+    if (now - hit.at < ttl) return hit.name;
+  }
+  // Owner/single-user: sem registro de tenant no upstream — nunca consulta.
+  if (!memKey || owner === OWNER) return null;
+  try {
+    const res = await fetchFn(`${MEMORY_URL}/api/tenant/profile`, {
+      headers: { Authorization: `Bearer ${memKey}` },
+      signal: AbortSignal.timeout(2_000),
+    });
+    if (!res.ok) {
+      cacheSet(owner, null);
+      return null;
+    }
+    const data = (await res.json().catch(() => null)) as { name?: unknown } | null;
+    const clean = sanitizeDisplayName(data?.name);
+    if (!clean.ok) {
+      cacheSet(owner, null);
+      return null;
+    }
+    cacheSet(owner, clean.name);
+    return clean.name;
+  } catch {
+    cacheSet(owner, null);
+    return null;
+  }
+}
+
+/**
+ * Linha de contexto por turno: nome entra CITADO como dado, nunca como
+ * instrução — display name é input do usuário.
  */
 export function personContext(name: string | null): string | null {
   if (!name) return null;
-  return `A pessoa com quem você está falando se chama "${name}". Trate-a pelo primeiro nome quando soar natural; não invente sobrenome, apelido ou outros dados sobre ela.`;
+  return `[USER PROFILE]\nname: "${name}"`;
 }
