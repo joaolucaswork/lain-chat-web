@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { GooPanel } from '@/components/GooPanel'
+import { GlyphPanel } from '@/components/GlyphPanel'
 import { ViscoseH1 } from '@/components/ViscoseH1'
 
 /**
@@ -76,7 +76,7 @@ export function LandingPage() {
             </a>
           </div>
         </div>
-        <GooPanel />
+        <GlyphPanel />
       </section>
     </PublicShell>
   )
