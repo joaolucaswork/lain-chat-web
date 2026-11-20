@@ -82,7 +82,6 @@ export function GooPanel() {
       const m = Math.min(w, h)
       const cx = w / 2
       const cy = h / 2
-      const maxD = Math.hypot(cx, cy)
       ctx.clearRect(0, 0, w, h)
 
       // Blobs invisíveis: só posições à deriva (foge do mouse).
@@ -122,10 +121,13 @@ export function GooPanel() {
           const near = md < MOUSE_R && md > 0.01 ? (MOUSE_R - md) / MOUSE_R : 0
           const px = x + (dx / (md || 1)) * near * PUSH
           const py = y + (dy / (md || 1)) * near * PUSH
-          const d = Math.hypot(px - cx, py - cy) / maxD
-          const mask = Math.max(0, 1 - d * d)
+          // Máscara radial elíptica: 1 no centro, 0 nas bordas (sem bloco).
+          const ex = (px - cx) / (w * 0.5)
+          const ey = (py - cy) / (h * 0.5)
+          const ed = Math.hypot(ex, ey)
+          const mask = Math.max(0, 1 - ed)
           if (mask <= 0.02) continue
-          const a = Math.min(0.65, cell.b * mask * (0.5 + near * 0.9))
+          const a = Math.min(0.65, cell.b * mask * mask * (0.5 + near * 0.9))
           ctx.fillStyle = `rgba(162, 230, 53, ${a.toFixed(3)})`
           ctx.fillText(cell.ch, px, py)
         }
@@ -153,7 +155,6 @@ export function GooPanel() {
   return (
     <div className="relative h-72 overflow-hidden sm:h-96 lg:h-[540px]" aria-hidden>
       <canvas ref={ref} className="absolute inset-0 h-full w-full mix-blend-screen" />
-      <div className="lain-noise pointer-events-none absolute inset-0" />
     </div>
   )
 }
