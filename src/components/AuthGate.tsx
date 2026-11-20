@@ -161,9 +161,10 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
       if (exchangedRef.current) return
       exchangedRef.current = true
       setSessionCheck('oauth')
-      void exchange(token, email).finally(() => {
-        // Sucesso = onDone recarrega a página; falha = volta pro form com o erro.
-        if (alive) setSessionCheck('none')
+      // WHY só volta pro form em falha: no sucesso o onDone recarrega a
+      // página — reverter aqui pintava o form por alguns frames (o flash).
+      void exchange(token, email).then((ok) => {
+        if (alive && !ok) setSessionCheck('none')
       })
     }
     void client.auth.getSession().then(({ data }) => {
@@ -190,7 +191,7 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  async function exchange(accessToken: string, emailHint: string, displayName?: string) {
+  async function exchange(accessToken: string, emailHint: string, displayName?: string): Promise<boolean> {
     setBusy(true)
     setError('')
     try {
@@ -202,12 +203,14 @@ export function AuthGate({ onDone }: { onDone: () => void }) {
       const data = (await res.json().catch(() => null)) as { tenant?: string; error?: string } | null
       if (!res.ok || !data?.tenant) {
         setError(data?.error ?? 'Falha ao abrir seu espaço. Tente de novo.')
-        return
+        return false
       }
       setTenantName(displayName || emailHint.split('@')[0] || data.tenant)
       onDone()
+      return true
     } catch {
       setError('Sem conexão com o servidor. Tente de novo.')
+      return false
     } finally {
       setBusy(false)
     }
