@@ -19,7 +19,7 @@ function PublicShell({
   children: React.ReactNode
   scrollRef?: React.RefObject<HTMLDivElement | null>
 }) {
-  /* Landing sempre dark (fósforo verde sobre #131416), independente do tema. */
+  /* Landing sempre dark (glifos cinza sobre #131416), independente do tema. */
   /* WHY scroll próprio: html/body têm overflow hidden (teclado virtual no
      chat mobile) — a landing rola no próprio container sem tocar no global. */
   return (

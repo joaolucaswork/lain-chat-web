@@ -154,7 +154,7 @@ export function GooPanel() {
           const edge = Math.min(1, Math.max(0, (1 - ed) / 0.15))
           if (edge <= 0.02) continue
           const a = Math.min(0.8, cell.b * edge * (0.55 + near * glow * 0.9))
-          ctx.fillStyle = `rgba(190, 242, 100, ${a.toFixed(3)})`
+          ctx.fillStyle = `rgba(199, 204, 212, ${a.toFixed(3)})`
           ctx.fillText(cell.ch, px, py)
         }
       }

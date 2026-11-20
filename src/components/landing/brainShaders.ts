@@ -157,11 +157,11 @@ void main() {
   float scan = mod(gl_FragCoord.y + mod(uTime * 9.0, 4.0) * uDpr, 4.0 * uDpr);
   if (scan < 1.0 * uDpr) a *= 0.45;
   if (a < 0.003) discard;
-  vec3 hero = vec3(0.745, 0.949, 0.392);
-  vec3 shade = mix(vec3(0.30, 0.48, 0.16), hero, pow(vRidge, 1.3));
+  vec3 hero = vec3(0.780, 0.800, 0.831);
+  vec3 shade = mix(vec3(0.32, 0.33, 0.36), hero, pow(vRidge, 1.3));
   shade *= mix(0.55, 1.0, vDepth);
   vec3 col = mix(hero, shade, vMix);
-  col = mix(col, vec3(0.925, 0.988, 0.796), clamp(vWave * 1.3, 0.0, 1.0));
+  col = mix(col, vec3(0.95, 0.96, 0.98), clamp(vWave * 1.3, 0.0, 1.0));
   oColor = vec4(col, a);
 }
 `
@@ -201,6 +201,6 @@ out vec4 oColor;
 
 void main() {
   if (vAlpha < 0.004) discard;
-  oColor = vec4(0.65, 0.9, 0.35, vAlpha);
+  oColor = vec4(0.55, 0.57, 0.61, vAlpha);
 }
 `
