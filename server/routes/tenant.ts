@@ -100,7 +100,7 @@ export async function handleTenant(req: Request, path: string): Promise<Response
       if (!res.ok) {
         const data = (await res.json().catch(() => null)) as { error?: unknown } | null;
         const detail = typeof data?.error === 'string' ? data.error : `upstream → ${res.status}`;
-        return json({ error: detail }, 502);
+        return json({ error: detail }, res.status >= 400 && res.status < 500 ? res.status : 502);
       }
     } catch {
       return json({ error: 'lain-memory unavailable' }, 502);
