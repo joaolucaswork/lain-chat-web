@@ -127,7 +127,7 @@ export function GooPanel() {
           const ed = Math.hypot(ex, ey)
           const mask = Math.max(0, 1 - ed)
           if (mask <= 0.02) continue
-          const a = Math.min(0.65, cell.b * mask * mask * (0.5 + near * 0.9))
+          const a = Math.min(0.7, cell.b * mask * (0.55 + near * 0.9))
           ctx.fillStyle = `rgba(162, 230, 53, ${a.toFixed(3)})`
           ctx.fillText(cell.ch, px, py)
         }
