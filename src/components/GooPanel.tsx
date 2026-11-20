@@ -7,7 +7,7 @@ import { useEffect, useRef } from 'react'
  * Reduzido a estático sob prefers-reduced-motion.
  */
 
-const BLOBS = 7
+const BLOBS = 10
 const GLYPHS = 'アイウエオカキクケコサシスセソ01<>*+#$%&?/\\|_='
 const CELL = 15
 const MOUSE_R = 170
@@ -36,7 +36,7 @@ export function GooPanel() {
       bx: 0.2 + 0.6 * ((i * 0.37) % 1),
       by: 0.28 + 0.5 * ((i * 0.53) % 1),
       r: 0.09 + 0.05 * ((i * 0.29) % 1),
-      sp: 0.00035 + 0.0002 * ((i * 0.41) % 1),
+      sp: 0.0009 + 0.0005 * ((i * 0.41) % 1),
       ph: i * 1.7,
       x: 0,
       y: 0,
@@ -103,8 +103,8 @@ export function GooPanel() {
 
       // Blobs invisíveis: só posições à deriva (foge do mouse).
       for (const b of blobs) {
-        const x = b.bx * w + Math.sin(t * b.sp + b.ph) * w * 0.08
-        const y = b.by * h + Math.cos(t * b.sp * 1.3 + b.ph) * h * 0.08
+        const x = b.bx * w + Math.sin(t * b.sp + b.ph) * w * 0.12
+        const y = b.by * h + Math.cos(t * b.sp * 1.3 + b.ph) * h * 0.12
         const dx = x - sm.x
         const dy = y - sm.y
         const d = Math.hypot(dx, dy)
@@ -127,7 +127,7 @@ export function GooPanel() {
           const y = r * CELL - CELL + yOff
           let f = 0
           for (const b of blobs) {
-            const br = b.r * m * 0.7
+            const br = b.r * m * 0.6
             const dd = (x - b.x) * (x - b.x) + (y - b.y) * (y - b.y)
             f += Math.exp(-dd / (2 * br * br))
           }
